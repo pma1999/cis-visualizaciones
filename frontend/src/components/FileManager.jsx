@@ -317,13 +317,17 @@ export default function FileManager({ onFileChange }) {
 
       {isOpen && (
         <div 
-          className="fixed sm:absolute sm:top-full sm:right-0 bg-white rounded-md shadow-lg z-50 border border-gray-200 max-h-[80vh] overflow-y-auto sm:mt-2 sm:w-96 md:w-[500px]" 
+          className="fixed sm:absolute sm:top-full sm:right-0 bg-white rounded-md shadow-lg z-50 border border-gray-200 max-h-[80vh] overflow-y-auto sm:mt-2"
           style={{
-            top: modalPosition.top !== 'auto' ? `${modalPosition.top}px` : 'auto',
-            bottom: modalPosition.bottom !== 'auto' ? `${modalPosition.bottom}px` : 'auto',
-            left: window.innerWidth < 640 ? '8px' : 'auto',
-            right: window.innerWidth < 640 ? '8px' : 'auto',
-            width: window.innerWidth < 640 ? 'calc(100% - 16px)' : 'auto',
+            // Mobile positioning
+            top: window.innerWidth < 640 ? (modalPosition.top !== 'auto' ? `${modalPosition.top}px` : 'auto') : '',
+            bottom: window.innerWidth < 640 ? (modalPosition.bottom !== 'auto' ? `${modalPosition.bottom}px` : 'auto') : '',
+            left: window.innerWidth < 640 ? '8px' : '',
+            right: window.innerWidth < 640 ? '8px' : '',
+            // Width adjustments
+            width: window.innerWidth < 640 ? 'calc(100% - 16px)' : 'min(500px, 90vw)',
+            // Always ensure it fits on screen horizontally
+            maxWidth: 'calc(100vw - 16px)',
           }}
         >
           <div className="p-3 sm:p-4">
