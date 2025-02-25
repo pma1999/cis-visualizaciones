@@ -182,6 +182,95 @@ export async function getContingencia(variable1, variable2) {
 }
 
 /**
+ * Get all available data files
+ * @returns {Promise<Object>} List of available files and active file
+ */
+export async function getAvailableFiles() {
+  const cacheKey = "available_files";
+  const cachedData = apiCache.get(cacheKey);
+  if (cachedData) return cachedData;
+  
+  const data = await fetchWithErrorHandling(`${API_URL}/files`);
+  apiCache.set(cacheKey, data);
+  return data;
+}
+
+/**
+ * Activate a data file
+ * @param {string} filename - Name of the file to activate
+ * @returns {Promise<Object>} Result of activation
+ */
+export async function activateFile(filename) {
+  try {
+    const data = await fetchWithErrorHandling(`${API_URL}/files/activate/${encodeURIComponent(filename)}`, {
+      method: 'POST',
+    });
+    
+    // Clear the cache since we've changed the active file
+    clearApiCache();
+    
+    return data;
+  } catch (error) {
+    console.error("Error activating file:", error);
+    throw error;
+  }
+}
+
+/**
+ * Upload a new data file
+ * @param {File} file - File object to upload
+ * @returns {Promise<Object>} Upload result
+ */
+export async function uploadFile(file) {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${API_URL}/files/upload`, {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header, let the browser set it with the boundary
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Clear the cache for files
+    apiCache.remove("available_files");
+    
+    return data;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a data file
+ * @param {string} filename - Name of file to delete
+ * @returns {Promise<Object>} Deletion result
+ */
+export async function deleteFile(filename) {
+  try {
+    const data = await fetchWithErrorHandling(`${API_URL}/files/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+    });
+    
+    // Clear the cache for files
+    apiCache.remove("available_files");
+    
+    return data;
+  } catch (error) {
+    console.error("Error deleting file:", error);
+    throw error;
+  }
+}
+
+/**
  * Clear the API cache
  */
 export function clearApiCache() {

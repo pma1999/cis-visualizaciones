@@ -1,29 +1,66 @@
-import { useEffect, useState, memo } from "react";
-import { getVariables } from "../api/cisApi";
+import { useEffect, useState, memo, useRef } from "react";
+import { getVariables, clearApiCache } from "../api/cisApi";
+import { useFiles } from "../contexts/FileContext";
+
+// Mantener el evento personalizado para compatibilidad con el código existente
+export const fileChangeEvent = new EventTarget();
 
 const VariablesList = memo(({ onSelect, excludeVariable, isCompact = false }) => {
   const [variables, setVariables] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const eventListenerAdded = useRef(false);
+  
+  // Usar el contexto de archivos para detectar cambios en el archivo activo
+  const { activeFile } = useFiles();
+  
+  const fetchVariables = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Limpiamos la caché antes de obtener variables para asegurar datos actualizados
+      clearApiCache(); 
+      const data = await getVariables();
+      console.log("Variables obtenidas:", data); // Log para depuración
+      setVariables(data || {});
+    } catch (err) {
+      console.error("Error al obtener variables:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Efecto para cargar variables iniciales
   useEffect(() => {
-    const fetchVariables = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getVariables();
-        console.log("Variables obtenidas:", data); // Log para depuración
-        setVariables(data || {});
-      } catch (err) {
-        console.error("Error al obtener variables:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchVariables();
+  }, []);
+  
+  // Efecto para recargar variables cuando cambia el archivo activo
+  useEffect(() => {
+    console.log("Archivo activo cambiado en VariablesList:", activeFile);
+    if (activeFile) {
+      fetchVariables();
+    }
+  }, [activeFile]);
+
+  // Mantener el efecto del evento para compatibilidad
+  useEffect(() => {
+    if (!eventListenerAdded.current) {
+      const handleFileChange = () => {
+        console.log("Evento de cambio de archivo detectado en VariablesList");
+        fetchVariables();
+      };
+      
+      fileChangeEvent.addEventListener('fileChange', handleFileChange);
+      eventListenerAdded.current = true;
+      
+      return () => {
+        fileChangeEvent.removeEventListener('fileChange', handleFileChange);
+        eventListenerAdded.current = false;
+      };
+    }
   }, []);
 
   const filteredVariables = Object.entries(variables)

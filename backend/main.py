@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -15,6 +15,8 @@ try:
         CORS_ALLOW_CREDENTIALS,
         CORS_ALLOW_METHODS,
         CORS_ALLOW_HEADERS,
+        ALLOWED_EXTENSIONS,
+        MAX_UPLOAD_SIZE,
         logger
     )
     from backend.services import (
@@ -23,7 +25,12 @@ try:
         obtener_datos_variable, 
         obtener_distribucion, 
         obtener_metadatos, 
-        obtener_contingencia
+        obtener_contingencia,
+        list_available_files,
+        get_active_data_file,
+        set_active_data_file,
+        upload_file,
+        delete_file
     )
 except ImportError:
     # Fallback for Railway deployment
@@ -36,6 +43,8 @@ except ImportError:
         CORS_ALLOW_CREDENTIALS,
         CORS_ALLOW_METHODS,
         CORS_ALLOW_HEADERS,
+        ALLOWED_EXTENSIONS,
+        MAX_UPLOAD_SIZE,
         logger
     )
     from services import (
@@ -44,7 +53,12 @@ except ImportError:
         obtener_datos_variable, 
         obtener_distribucion, 
         obtener_metadatos, 
-        obtener_contingencia
+        obtener_contingencia,
+        list_available_files,
+        get_active_data_file,
+        set_active_data_file,
+        upload_file,
+        delete_file
     )
 
 # Create FastAPI application
@@ -148,3 +162,82 @@ def obtener_contingencia_variables(variable1: str, variable2: str):
     except Exception as e:
         logger.error(f"Error in /contingencia/{variable1}/{variable2}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener la tabla de contingencia para {variable1} y {variable2}")
+
+# Nuevas rutas para gestión de archivos
+@app.get("/files")
+def get_available_files():
+    """Get a list of available .sav files in the data directory."""
+    try:
+        files = list_available_files()
+        active_file = get_active_data_file()
+        return {
+            "files": files, 
+            "active_file": active_file
+        }
+    except Exception as e:
+        logger.error(f"Error in /files: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al listar los archivos disponibles")
+
+@app.post("/files/activate/{filename}")
+def activate_file(filename: str):
+    """Set the active data file to use for analysis."""
+    try:
+        result = set_active_data_file(filename)
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in /files/activate/{filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al activar el archivo {filename}")
+
+@app.post("/files/upload")
+async def upload_data_file(file: UploadFile = File(...)):
+    """Upload a new .sav file."""
+    try:
+        # Validate file size
+        file_size = file.size
+        if file_size and file_size > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413, 
+                detail=f"El archivo es demasiado grande. El tamaño máximo permitido es {MAX_UPLOAD_SIZE / (1024 * 1024)} MB"
+            )
+        
+        # Validate file extension
+        _, file_ext = os.path.splitext(file.filename)
+        if file_ext.lower() not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=415, 
+                detail=f"Formato de archivo no válido. Solo se aceptan archivos con extensiones: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        
+        # Read file content
+        contents = await file.read()
+        
+        # Upload file
+        result = upload_file(contents, file.filename)
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading file {file.filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al subir el archivo: {str(e)}")
+
+@app.delete("/files/{filename}")
+def delete_data_file(filename: str):
+    """Delete a .sav file from the data directory."""
+    try:
+        result = delete_file(filename)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting file {filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al eliminar el archivo: {str(e)}")

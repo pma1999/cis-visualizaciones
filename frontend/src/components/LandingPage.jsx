@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom';
+import FileManager from './FileManager';
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-500 to-blue-700 text-white">
       <div className="container mx-auto px-4 py-16">
+        <div className="flex justify-end mb-4">
+          <FileManager onFileChange={() => {}} />
+        </div>
+        
         <div className="text-center">
           <h1 className="text-5xl font-bold mb-6">Análisis de Datos CIS</h1>
           <p className="text-xl mb-8">
