@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAvailableFiles, activateFile, uploadFile, deleteFile } from '../api/cisApi';
+import { getAvailableFiles, activateFile, uploadFile } from '../api/cisApi';
 import { fileChangeEvent } from './VariablesList';
 import { useFiles } from '../contexts/FileContext';
 
@@ -170,23 +170,6 @@ export default function FileManager({ onFileChange }) {
     }
   };
 
-  const handleDeleteFile = async (filename) => {
-    if (!confirm(`¿Estás seguro que deseas eliminar el archivo '${filename}'?`)) {
-      return;
-    }
-
-    try {
-      await deleteFile(filename);
-      
-      // Reload files list
-      await loadFiles();
-      
-      showNotification('Archivo eliminado correctamente');
-    } catch (err) {
-      setError(`Error al eliminar el archivo: ${err.message}`);
-    }
-  };
-  
   const startEditingFriendlyName = (filename) => {
     if (filename) {
       setEditingFile(filename);
@@ -712,15 +695,6 @@ export default function FileManager({ onFileChange }) {
                                             </>
                                           )}
                                         </button>
-                                        <button
-                                          onClick={() => handleDeleteFile(file.name)}
-                                          className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
-                                        >
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                          </svg>
-                                          <span>Eliminar</span>
-                                        </button>
                                       </>
                                     )}
                                   </div>
@@ -769,16 +743,6 @@ export default function FileManager({ onFileChange }) {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                       </svg>
                                     )}
-                                  </button>
-                                
-                                  <button
-                                    onClick={() => handleDeleteFile(file.name)}
-                                      className="p-1 text-red-600 hover:text-red-900 rounded-full hover:bg-red-50"
-                                    title="Eliminar archivo"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
                                   </button>
                                 </>
                               ) : (

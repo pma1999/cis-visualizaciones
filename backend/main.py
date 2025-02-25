@@ -287,15 +287,16 @@ async def upload_data_file(file: UploadFile = File(...)):
 def delete_data_file(filename: str):
     """Delete a .sav file from the data directory."""
     try:
+        # File deletion is disabled to protect shared files
+        logger.warning(f"File deletion attempt blocked for: {filename}")
         result = delete_file(filename)
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-        return result
+        # The delete_file function now always returns an error
+        raise HTTPException(status_code=403, detail=result["error"])
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting file {filename}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error al eliminar el archivo: {str(e)}")
+        logger.error(f"Error in delete file endpoint for {filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar la solicitud: {str(e)}")
 
 # Add these new models for request validation
 class FileNameUpdate(BaseModel):

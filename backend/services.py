@@ -164,6 +164,12 @@ def delete_file(filename: str) -> Dict[str, Any]:
     Returns:
         Dict with status message
     """
+    # File deletion is disabled to prevent users from deleting files that are shared by all users
+    logger.warning(f"File deletion attempt blocked for: {filename}")
+    return {"error": "La eliminación de archivos ha sido deshabilitada para proteger los datos compartidos"}
+    
+    # Original implementation commented out
+    """
     try:
         # Don't allow deleting the default file
         if filename == DEFAULT_DATA_FILE:
@@ -191,6 +197,7 @@ def delete_file(filename: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error deleting file: {str(e)}")
         return {"error": f"Error al eliminar el archivo: {str(e)}"}
+    """
 
 def load_dataset():
     """Load the dataset and return dataframe and metadata."""
