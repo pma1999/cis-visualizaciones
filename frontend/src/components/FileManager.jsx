@@ -258,11 +258,11 @@ export default function FileManager({ onFileChange }) {
         </svg>
         {displayedActiveFile ? (
           <span className="truncate max-w-[100px] sm:max-w-[150px] inline-block">
-            <span className="hidden xs:inline">Archivo:</span> {displayedActiveFile}
+            {displayedActiveFile}
           </span>
         ) : (
           <span>
-            <span className="hidden xs:inline">Seleccionar</span> archivo
+            Archivo
           </span>
         )}
       </button>
@@ -493,16 +493,16 @@ export default function FileManager({ onFileChange }) {
               </div>
             ) : (
               <div className="overflow-hidden border border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-3/5">
                         ARCHIVO
                       </th>
-                      <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
                         TAMAÑO
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
                         ACCIONES
                       </th>
                     </tr>
@@ -560,7 +560,7 @@ export default function FileManager({ onFileChange }) {
                                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                   </svg>
                                 </button>
-                                <div className="hidden absolute right-0 z-10 mt-2 bg-white border border-gray-200 rounded shadow-lg w-48">
+                                <div className="hidden absolute right-0 z-10 mt-2 bg-white border border-gray-200 rounded shadow-lg w-48" style={{ right: '0', left: 'auto' }}>
                                   <div className="py-1">
                                     <button
                                       onClick={() => viewFileInfo(file.name)}
@@ -595,62 +595,64 @@ export default function FileManager({ onFileChange }) {
                                 </div>
                               </div>
                               
-                              {/* Desktop actions */}
-                              <button
-                                onClick={() => viewFileInfo(file.name)}
-                                className="hidden sm:inline-block p-1 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100"
-                                title="Ver información"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              </button>
-                              
-                              <button
-                                onClick={() => startEditingFriendlyName(file.name)}
-                                className="hidden sm:inline-block p-1 text-blue-600 hover:text-blue-900 rounded-full hover:bg-blue-50"
-                                title="Editar nombre"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </button>
-                              
-                              {activeFile !== file.name ? (
-                                <>
-                                  <button
-                                    onClick={() => handleActivateFile(file.name)}
-                                    disabled={processingFile === file.name}
-                                    className={`hidden sm:inline-block p-1 text-green-600 hover:text-green-900 rounded-full hover:bg-green-50 ${
-                                      processingFile === file.name ? 'opacity-50 cursor-not-allowed' : ''
-                                    }`}
-                                    title="Activar archivo"
-                                  >
-                                    {processingFile === file.name ? (
-                                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                      </svg>
-                                    ) : (
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    )}
-                                  </button>
+                              {/* Desktop actions - compact icons with tooltips */}
+                              <div className="hidden sm:flex sm:items-center sm:space-x-1">
+                                <button
+                                  onClick={() => viewFileInfo(file.name)}
+                                  className="p-1 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100"
+                                  title="Ver información"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </button>
                                 
-                                  <button
-                                    onClick={() => handleDeleteFile(file.name)}
-                                    className="hidden sm:inline-block p-1 text-red-600 hover:text-red-900 rounded-full hover:bg-red-50"
-                                    title="Eliminar archivo"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="hidden sm:inline-block text-gray-400 px-2">Activo</span>
-                              )}
+                                <button
+                                  onClick={() => startEditingFriendlyName(file.name)}
+                                  className="p-1 text-blue-600 hover:text-blue-900 rounded-full hover:bg-blue-50"
+                                  title="Editar nombre"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                
+                                {activeFile !== file.name ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleActivateFile(file.name)}
+                                      disabled={processingFile === file.name}
+                                      className={`p-1 text-green-600 hover:text-green-900 rounded-full hover:bg-green-50 ${
+                                        processingFile === file.name ? 'opacity-50 cursor-not-allowed' : ''
+                                      }`}
+                                      title="Activar archivo"
+                                    >
+                                      {processingFile === file.name ? (
+                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                      ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      )}
+                                    </button>
+                                  
+                                    <button
+                                      onClick={() => handleDeleteFile(file.name)}
+                                      className="p-1 text-red-600 hover:text-red-900 rounded-full hover:bg-red-50"
+                                      title="Eliminar archivo"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-400 px-2">Activo</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
