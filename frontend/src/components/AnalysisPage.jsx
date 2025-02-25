@@ -166,12 +166,10 @@ export default function AnalysisPage() {
         </aside>
 
         {/* Overlay para cerrar el drawer en todos los tamaños */}
-        {isSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-30"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
+        <div 
+          className={`fixed inset-0 bg-black z-30 transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-50 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          onClick={() => setIsSidebarOpen(false)}
+        />
 
         {/* Main content - Modified to use full width when sidebar is closed */}
         <main className={`
