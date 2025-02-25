@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { getAvailableFiles, activateFile, clearApiCache } from '../api/cisApi';
 
 // Crear el contexto
@@ -6,6 +6,10 @@ export const FileContext = createContext();
 
 // Hook personalizado para acceder al contexto
 export const useFiles = () => useContext(FileContext);
+
+// Constantes de configuración
+const API_POLLING_INTERVAL = import.meta.env.PROD ? 60000 : 10000; // 1 min en producción, 10 seg en desarrollo
+const THROTTLE_INTERVAL = 2000; // Mínimo tiempo entre llamadas API (2 segundos)
 
 // Función auxiliar para obtener/guardar en localStorage
 const getStoredActiveFile = () => {
@@ -33,37 +37,55 @@ export const FileProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastSyncTime, setLastSyncTime] = useState(0);
+  const [lastModifiedHash, setLastModifiedHash] = useState(null);
+  const pollingTimeoutRef = useRef(null);
+  const isMountedRef = useRef(true);
   
   // Actualizar localStorage cuando cambia el archivo activo
   useEffect(() => {
     if (activeFile) {
-      console.log(`FileContext: Guardando archivo activo en localStorage: "${activeFile}"`);
       setStoredActiveFile(activeFile);
     }
   }, [activeFile]);
   
-  // Función para cargar la lista de archivos
-  const loadFiles = async (forceFetch = false) => {
+  // Función para verificar si los archivos han cambiado
+  const calculateFilesHash = useCallback((filesList) => {
+    return filesList
+      .map(file => `${file.name}-${file.last_modified}`)
+      .sort()
+      .join('|');
+  }, []);
+  
+  // Función para cargar la lista de archivos optimizada con throttling y detección de cambios
+  const loadFiles = useCallback(async (forceFetch = false) => {
     try {
+      if (!isMountedRef.current) return;
+      
       setIsLoading(true);
       setError(null);
       
       // Evitar llamadas a la API demasiado frecuentes a menos que sea forzado
-      if (!forceFetch && Date.now() - lastSyncTime < 2000) {
-        // Eliminar debug excesivo
+      if (!forceFetch && Date.now() - lastSyncTime < THROTTLE_INTERVAL) {
         setIsLoading(false);
         return;
       }
       
-      // Evitar problemas de caché forzando recarga completa
-      clearApiCache(); // Limpiar caché antes de obtener archivos
-      
+      // No limpiar caché en cada petición para mejorar rendimiento
       const data = await getAvailableFiles();
-      setFiles(data.files || []);
       
-      // Actualizar archivo activo solo si cambió
-      if (data.active_file !== activeFile) {
-        setActiveFile(data.active_file || '');
+      // Calcular hash de los archivos para detectar cambios
+      const newHash = calculateFilesHash(data.files || []);
+      const filesChanged = newHash !== lastModifiedHash;
+      
+      // Solo actualizar state si hay cambios o es forzado
+      if (filesChanged || forceFetch) {
+        setFiles(data.files || []);
+        setLastModifiedHash(newHash);
+        
+        // Actualizar archivo activo solo si cambió
+        if (data.active_file !== activeFile) {
+          setActiveFile(data.active_file || '');
+        }
       }
       
       setLastSyncTime(Date.now());
@@ -73,7 +95,7 @@ export const FileProvider = ({ children }) => {
       setIsLoading(false);
       console.error('Error loading files:', err);
     }
-  };
+  }, [activeFile, lastSyncTime, lastModifiedHash, calculateFilesHash]);
   
   // Función para activar un archivo
   const handleActivateFile = async (filename) => {
@@ -84,8 +106,9 @@ export const FileProvider = ({ children }) => {
     try {
       setIsLoading(true);
       
-      // Limpiar caché antes de activar
-      clearApiCache();
+      // Limpiar caché relacionada con archivos, no toda la caché
+      clearApiCache('available_files');
+      clearApiCache('variables');
       
       // Primera activación
       const activationResult = await activateFile(filename);
@@ -103,8 +126,8 @@ export const FileProvider = ({ children }) => {
         // Esperamos un poco entre intentos (incrementalmente)
         await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
         
-        // Limpiar caché antes de verificar
-        clearApiCache();
+        // Limpiar caché específica antes de verificar
+        clearApiCache('available_files');
         
         const data = await getAvailableFiles();
         
@@ -113,17 +136,19 @@ export const FileProvider = ({ children }) => {
           backendVerified = true;
         } else {
           // Reintento de activación silencioso
-          clearApiCache(); 
+          clearApiCache('available_files'); 
           await activateFile(filename);
           retryCount++;
         }
         
         // Actualizar lista de archivos
         setFiles(data.files || []);
+        // Actualizar hash
+        setLastModifiedHash(calculateFilesHash(data.files || []));
       }
       
       // Verificación final
-      clearApiCache();
+      clearApiCache('available_files');
       const finalCheck = await getAvailableFiles();
       
       // Actualizar el archivo activo final
@@ -134,8 +159,10 @@ export const FileProvider = ({ children }) => {
       setLastSyncTime(Date.now());
       setIsLoading(false);
       
-      // Limpiar caché API para forzar recarga de datos
-      clearApiCache();
+      // Limpiar caché para forzar recarga de datos relacionados
+      clearApiCache('variables');
+      clearApiCache('datos');
+      clearApiCache('distribucion');
       
       return { 
         success: true, 
@@ -152,8 +179,50 @@ export const FileProvider = ({ children }) => {
     }
   };
   
+  // Función para controlar el polling basado en la visibilidad del documento
+  const setupPolling = useCallback(() => {
+    // Cancelar cualquier polling anterior
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+    }
+    
+    const poll = () => {
+      if (!isMountedRef.current) return;
+      
+      // Solo realizar polling si el documento está visible
+      if (document.visibilityState === 'visible') {
+        loadFiles();
+      }
+      
+      // Programar siguiente polling
+      pollingTimeoutRef.current = setTimeout(poll, API_POLLING_INTERVAL);
+    };
+    
+    // Iniciar polling
+    poll();
+    
+    return () => {
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+      }
+    };
+  }, [loadFiles]);
+  
   // Cargar la lista de archivos al montar el componente
   useEffect(() => {
+    // Inicializar bandera de montado
+    isMountedRef.current = true;
+    
+    // Manejar visibilidad del documento para pausar/reanudar polling
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Si se vuelve visible, forzar recarga
+        loadFiles(true);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     // Si tenemos un archivo activo en localStorage, intentar reactivarlo
     const storedFile = getStoredActiveFile();
     if (storedFile) {
@@ -171,13 +240,16 @@ export const FileProvider = ({ children }) => {
       loadFiles(true);
     }
     
-    // Configurar intervalo para sincronizar con el backend cada 5 segundos
-    const syncInterval = setInterval(() => {
-      loadFiles();
-    }, 5000);
+    // Configurar polling inteligente
+    const cleanup = setupPolling();
     
-    return () => clearInterval(syncInterval);
-  }, []);
+    // Limpieza al desmontar
+    return () => {
+      isMountedRef.current = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      cleanup();
+    };
+  }, [loadFiles, setupPolling]);
   
   // Valores y funciones que estarán disponibles a través del contexto
   const value = {

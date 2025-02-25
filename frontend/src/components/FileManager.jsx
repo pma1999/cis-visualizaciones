@@ -28,13 +28,13 @@ export default function FileManager({ onFileChange }) {
 
   // Efecto para cargar archivos iniciales y configurar sincronización
   useEffect(() => {
-    loadFiles();
-    
-    // Sincronizar al abrir/cerrar el diálogo
+    // Cargar archivos solo cuando:
+    // 1. El componente se monta inicialmente
+    // 2. El diálogo se abre
     if (isOpen) {
       loadFiles();
     }
-  }, [isOpen]);
+  }, [isOpen]); // Sólo dependencia es isOpen
 
   const handleActivateFile = async (filename) => {
     // Evitar activar el mismo archivo
@@ -65,9 +65,6 @@ export default function FileManager({ onFileChange }) {
         if (onFileChange) {
           onFileChange(result.activeFile);
         }
-        
-        // Forzar recarga de archivos
-        setTimeout(() => loadFiles(), 500);
       } else {
         setError(`Error al activar el archivo: ${result.message}`);
       }

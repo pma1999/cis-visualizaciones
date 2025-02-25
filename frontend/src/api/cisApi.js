@@ -9,13 +9,30 @@ const API_URL = import.meta.env.VITE_API_URL || "https://cis-visualizaciones-pro
 // Cache Implementation
 class ApiCache {
   constructor() {
+    // En producción, cachear más tiempo por defecto (15 minutos vs 5 en desarrollo)
+    const isProd = import.meta.env.PROD;
     const enableCache = import.meta.env.VITE_ENABLE_CACHE !== "false";
-    const cacheTTLMinutes = parseInt(import.meta.env.VITE_CACHE_TTL_MINUTES || "5", 10);
+    const defaultTTL = isProd ? 15 : 5;
+    const cacheTTLMinutes = parseInt(import.meta.env.VITE_CACHE_TTL_MINUTES || defaultTTL, 10);
     
     this.cache = {};
     this.cacheTTL = cacheTTLMinutes * 60 * 1000; // Convert minutes to milliseconds
     this.cacheTimestamps = {};
     this.enabled = enableCache;
+    
+    // TTL especial por tipo de recurso (en milisegundos)
+    this.resourceTTL = {
+      // La lista de archivos se actualiza con menos frecuencia en producción
+      "available_files": isProd ? 30000 : 5000, // 30 seg en prod, 5 seg en dev
+      // Datos de variables se cachean más tiempo
+      "variables": isProd ? 3600000 : 300000, // 1 hora en prod, 5 min en dev
+    };
+    
+    // Contador de solicitudes para prevenir sobrecarga
+    this.requestCounts = {};
+    this.requestCountResetInterval = setInterval(() => {
+      this.requestCounts = {};
+    }, 60000); // Reset cada minuto
   }
 
   /**
@@ -29,8 +46,17 @@ class ApiCache {
     const timestamp = this.cacheTimestamps[key] || 0;
     const now = Date.now();
     
+    // Determinar TTL específico para este recurso
+    let ttl = this.cacheTTL;
+    for (const resourceKey in this.resourceTTL) {
+      if (key.includes(resourceKey)) {
+        ttl = this.resourceTTL[resourceKey];
+        break;
+      }
+    }
+    
     // Check if cache is expired
-    if (now - timestamp > this.cacheTTL) {
+    if (now - timestamp > ttl) {
       this.remove(key);
       return null;
     }
@@ -66,9 +92,69 @@ class ApiCache {
     this.cache = {};
     this.cacheTimestamps = {};
   }
+  
+  /**
+   * Clear cache for specific resource pattern
+   * @param {string} pattern - Pattern to match in cache keys
+   */
+  clearPattern(pattern) {
+    if (!pattern) return;
+    
+    Object.keys(this.cache).forEach(key => {
+      if (key.includes(pattern)) {
+        this.remove(key);
+      }
+    });
+  }
+  
+  /**
+   * Check if a request should be throttled to prevent API abuse
+   * @param {string} url - Request URL
+   * @returns {boolean} - True if should throttle, false otherwise
+   */
+  shouldThrottle(url) {
+    // Extraer patrón base de la URL
+    const urlPattern = url.split('?')[0].replace(API_URL, '');
+    
+    // Inicializar contador si no existe
+    if (!this.requestCounts[urlPattern]) {
+      this.requestCounts[urlPattern] = 0;
+    }
+    
+    // Incrementar contador
+    this.requestCounts[urlPattern]++;
+    
+    // Límites por tipo de endpoint
+    const limits = {
+      "/files": 10,
+      "/variables": 5,
+      default: 20
+    };
+    
+    // Determinar límite aplicable
+    let limit = limits.default;
+    Object.keys(limits).forEach(pattern => {
+      if (urlPattern.includes(pattern)) {
+        limit = limits[pattern];
+      }
+    });
+    
+    // Determinar si debería limitarse
+    return this.requestCounts[urlPattern] > limit;
+  }
+  
+  // Limpiar al destruir
+  destroy() {
+    clearInterval(this.requestCountResetInterval);
+  }
 }
 
 const apiCache = new ApiCache();
+
+// Asegurar limpieza de recursos al cerrar
+window.addEventListener('beforeunload', () => {
+  apiCache.destroy();
+});
 
 /**
  * Fetch data from API with error handling
@@ -79,7 +165,28 @@ const apiCache = new ApiCache();
  */
 async function fetchWithErrorHandling(url, options = {}) {
   try {
-    console.log(`Fetching from: ${url}`);
+    // Comprobar límites de API para evitar sobrecargas
+    if (apiCache.shouldThrottle(url) && options.method !== 'POST') {
+      console.warn(`Throttling request to: ${url}`);
+      
+      // Usar caché existente si disponible o esperar un poco y reintentar
+      const cacheKey = getCacheKeyFromUrl(url);
+      const cachedData = apiCache.get(cacheKey);
+      
+      if (cachedData) {
+        console.log(`Serving throttled request from cache: ${url}`);
+        return cachedData;
+      }
+      
+      // Esperar un momento antes de intentar
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Solo mostrar logs de fetch en desarrollo
+    if (import.meta.env.DEV) {
+      console.log(`Fetching from: ${url}`);
+    }
+    
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -107,6 +214,13 @@ async function fetchWithErrorHandling(url, options = {}) {
     // Rethrow the error for further handling
     throw error;
   }
+}
+
+// Helper para obtener clave de caché a partir de URL
+function getCacheKeyFromUrl(url) {
+  const urlObj = new URL(url);
+  const path = urlObj.pathname.replace(/\//g, '_');
+  return path;
 }
 
 /**
@@ -271,10 +385,15 @@ export async function deleteFile(filename) {
 }
 
 /**
- * Clear the API cache
+ * Clear the API cache for specific pattern or completely
+ * @param {string} pattern - Optional pattern to match cache keys
  */
-export function clearApiCache() {
-  apiCache.clear();
+export function clearApiCache(pattern) {
+  if (pattern) {
+    apiCache.clearPattern(pattern);
+  } else {
+    apiCache.clear();
+  }
 }
 
 export { API_URL };
