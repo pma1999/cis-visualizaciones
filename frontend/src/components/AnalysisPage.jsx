@@ -87,8 +87,32 @@ export default function AnalysisPage() {
             </div>
             <div className="flex space-x-4">
               <FileManager onFileChange={handleFileChange} />
-              <Link to="/" className="text-white hover:text-blue-200">
-                Volver al inicio
+              <Link 
+                to="/" 
+                className="text-white hover:text-blue-200 flex items-center justify-center transition-all duration-200"
+                aria-label="Volver al inicio"
+                title="Volver al inicio"
+              >
+                <svg 
+                  className="w-5 h-5 sm:w-6 sm:h-6" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M3 12l9-9 9 9M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" 
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"
+                  />
+                </svg>
               </Link>
             </div>
           </div>
