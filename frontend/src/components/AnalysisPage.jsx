@@ -70,12 +70,12 @@ export default function AnalysisPage() {
       <div className="bg-blue-600 shadow-md">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
-            {/* Menu button integrated into header for mobile */}
+            {/* Menu button for both mobile and desktop */}
             <div className="flex items-center">
               {!isSidebarOpen && (
                 <button 
                   onClick={() => setIsSidebarOpen(true)}
-                  className="md:hidden mr-3 text-white p-2 rounded-lg"
+                  className="mr-3 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
                   aria-label="Abrir menú de variables"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,23 +120,22 @@ export default function AnalysisPage() {
       </div>
 
       <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col md:flex-row">
-        {/* Sidebar/Drawer */}
+        {/* Sidebar/Drawer - Modified to be collapsible on all screen sizes */}
         <aside className={`
-          md:w-1/4 bg-white shadow-lg
-          fixed md:static top-0 left-0 h-screen z-40
+          bg-white shadow-lg
+          fixed md:fixed top-0 left-0 h-screen z-40
           transform transition-transform duration-300 ease-in-out
-          w-3/4 sm:w-2/3
+          w-3/4 sm:w-2/3 md:w-80
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:translate-x-0
           flex flex-col
         `}>
           {/* Header del drawer con nuevo diseño */}
           <div className="p-6 border-b flex justify-between items-center">
             <h2 className="text-lg font-semibold">Variables Disponibles</h2>
-            {/* Botón de cerrar - solo visible en móvil */}
+            {/* Botón de cerrar - visible en todos los tamaños */}
             <button 
               onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Cerrar menú de variables"
             >
               <svg 
@@ -166,16 +165,20 @@ export default function AnalysisPage() {
           </div>
         </aside>
 
-        {/* Overlay para cerrar el drawer en móvil */}
+        {/* Overlay para cerrar el drawer en todos los tamaños */}
         {isSidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+            className="fixed inset-0 bg-black bg-opacity-50 z-30"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
 
-        {/* Main content */}
-        <main className="flex-1 p-4 md:p-8">
+        {/* Main content - Modified to use full width when sidebar is closed */}
+        <main className={`
+          flex-1 p-4 md:p-8 
+          transition-all duration-300 ease-in-out
+          ${isSidebarOpen ? 'md:ml-80' : 'ml-0'}
+        `}>
           <h1 className="text-2xl md:text-3xl font-bold mb-6 mt-4 md:mt-0">
             Visualización del CIS
           </h1>
