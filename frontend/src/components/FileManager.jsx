@@ -249,24 +249,26 @@ export default function FileManager({ onFileChange }) {
     <div className="relative">
       <button 
         onClick={toggleOpen}
-        className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        className="flex items-center px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         title={`Archivo activo: ${activeFile ? getFileFriendlyName(activeFile) : 'Ninguno'}`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 sm:mr-2" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clipRule="evenodd" />
           <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
         </svg>
         {displayedActiveFile ? (
-          <span className="truncate max-w-[150px] inline-block">
-            Archivo: {displayedActiveFile}
+          <span className="truncate max-w-[100px] sm:max-w-[150px] inline-block">
+            <span className="hidden xs:inline">Archivo:</span> {displayedActiveFile}
           </span>
         ) : (
-          'Seleccionar archivo'
+          <span>
+            <span className="hidden xs:inline">Seleccionar</span> archivo
+          </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 w-96 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+        <div className="absolute top-full mt-2 right-0 w-full sm:w-96 md:w-[500px] bg-white rounded-md shadow-lg z-50 border border-gray-200 max-h-[80vh] overflow-y-auto">
           <div className="p-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">Gestión de archivos</h3>
@@ -490,17 +492,17 @@ export default function FileManager({ onFileChange }) {
                 Cargando archivos...
               </div>
             ) : (
-              <div className="overflow-hidden overflow-x-auto border border-gray-200 rounded-lg">
+              <div className="overflow-hidden border border-gray-200 rounded-lg">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         ARCHIVO
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         TAMAÑO
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         ACCIONES
                       </th>
                     </tr>
@@ -515,16 +517,16 @@ export default function FileManager({ onFileChange }) {
                     ) : (
                       files.map((file) => (
                         <tr key={file.name} className={activeFile === file.name ? 'bg-blue-50' : ''}>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
                             <div className="flex flex-col">
                               <div className="flex items-center">
                                 {file.friendly_name && file.friendly_name !== file.name ? (
                                   <>
-                                    <span className="font-medium">{file.friendly_name}</span>
-                                    <span className="ml-1 text-xs text-gray-500">({file.name})</span>
+                                    <span className="font-medium break-words">{file.friendly_name}</span>
+                                    <span className="ml-1 text-xs text-gray-500 hidden sm:inline">({file.name})</span>
                                   </>
                                 ) : (
-                                  <span>{file.name}</span>
+                                  <span className="break-words">{file.name}</span>
                                 )}
                                 {activeFile === file.name && (
                                   <span className="ml-2 text-xs font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
@@ -533,20 +535,70 @@ export default function FileManager({ onFileChange }) {
                                 )}
                               </div>
                               {file.description && (
-                                <span className="text-xs text-gray-500 mt-1 truncate max-w-[200px]">
+                                <span className="text-xs text-gray-500 mt-1 break-words max-w-[200px] sm:max-w-[300px]">
                                   {file.description}
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {formatSize(file.size_kb)}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <div className="flex space-x-2">
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            <div className="flex justify-end space-x-1 sm:space-x-2">
+                              {/* Mobile dropdown menu */}
+                              <div className="relative sm:hidden">
+                                <button 
+                                  className="p-1 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    const dropdown = e.currentTarget.nextElementSibling;
+                                    dropdown.classList.toggle('hidden');
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                  </svg>
+                                </button>
+                                <div className="hidden absolute right-0 z-10 mt-2 bg-white border border-gray-200 rounded shadow-lg w-48">
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => viewFileInfo(file.name)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                    >
+                                      Ver información
+                                    </button>
+                                    <button
+                                      onClick={() => startEditingFriendlyName(file.name)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                    >
+                                      Editar nombre
+                                    </button>
+                                    {activeFile !== file.name && (
+                                      <>
+                                        <button
+                                          onClick={() => handleActivateFile(file.name)}
+                                          disabled={processingFile === file.name}
+                                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                                        >
+                                          {processingFile === file.name ? 'Activando...' : 'Activar archivo'}
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteFile(file.name)}
+                                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                                        >
+                                          Eliminar archivo
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Desktop actions */}
                               <button
                                 onClick={() => viewFileInfo(file.name)}
-                                className="text-gray-600 hover:text-gray-900"
+                                className="hidden sm:inline-block p-1 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100"
                                 title="Ver información"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -556,7 +608,7 @@ export default function FileManager({ onFileChange }) {
                               
                               <button
                                 onClick={() => startEditingFriendlyName(file.name)}
-                                className="text-blue-600 hover:text-blue-900"
+                                className="hidden sm:inline-block p-1 text-blue-600 hover:text-blue-900 rounded-full hover:bg-blue-50"
                                 title="Editar nombre"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -569,7 +621,7 @@ export default function FileManager({ onFileChange }) {
                                   <button
                                     onClick={() => handleActivateFile(file.name)}
                                     disabled={processingFile === file.name}
-                                    className={`text-green-600 hover:text-green-900 ${
+                                    className={`hidden sm:inline-block p-1 text-green-600 hover:text-green-900 rounded-full hover:bg-green-50 ${
                                       processingFile === file.name ? 'opacity-50 cursor-not-allowed' : ''
                                     }`}
                                     title="Activar archivo"
@@ -588,7 +640,7 @@ export default function FileManager({ onFileChange }) {
                                 
                                   <button
                                     onClick={() => handleDeleteFile(file.name)}
-                                    className="text-red-600 hover:text-red-900"
+                                    className="hidden sm:inline-block p-1 text-red-600 hover:text-red-900 rounded-full hover:bg-red-50"
                                     title="Eliminar archivo"
                                   >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -597,7 +649,7 @@ export default function FileManager({ onFileChange }) {
                                   </button>
                                 </>
                               ) : (
-                                <span className="text-gray-400 px-2">Activo</span>
+                                <span className="hidden sm:inline-block text-gray-400 px-2">Activo</span>
                               )}
                             </div>
                           </td>
