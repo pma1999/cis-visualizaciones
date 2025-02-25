@@ -29,6 +29,7 @@ export default function FileManager({ onFileChange }) {
   const [editDescription, setEditDescription] = useState('');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const editNameInputRef = useRef(null);
+  const [modalPosition, setModalPosition] = useState({ top: 'auto', bottom: 'auto' });
   
   // Actualizar el archivo mostrado cuando cambia el archivo activo en el contexto
   useEffect(() => {
@@ -56,6 +57,29 @@ export default function FileManager({ onFileChange }) {
       editNameInputRef.current.focus();
     }
   }, [editingFile]);
+
+  // Add an useEffect hook to handle outside clicks for mobile dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const dropdowns = document.querySelectorAll('.file-action-dropdown');
+      
+      dropdowns.forEach(dropdown => {
+        // Check if the click was outside the dropdown and its toggle button
+        const toggleButton = dropdown.previousElementSibling;
+        if (!dropdown.contains(event.target) && !toggleButton.contains(event.target)) {
+          dropdown.classList.add('hidden');
+        }
+      });
+    };
+    
+    // Add event listener when component mounts
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // Remove event listener when component unmounts
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleActivateFile = async (filename) => {
     // Evitar activar el mismo archivo
@@ -242,22 +266,46 @@ export default function FileManager({ onFileChange }) {
     // Si estamos abriendo el diálogo, refrescar la lista de archivos
     if (newIsOpen) {
       loadFiles();
+      
+      // Calculate optimal position for the modal on mobile
+      setTimeout(() => {
+        const windowHeight = window.innerHeight;
+        const scrollY = window.scrollY;
+        const buttonPos = document.getElementById('file-manager-toggle-btn')?.getBoundingClientRect();
+        
+        if (buttonPos && window.innerWidth < 640) { // Mobile view
+          const spaceBelow = windowHeight - buttonPos.bottom;
+          const spaceAbove = buttonPos.top;
+          
+          // If more space below, position below button
+          if (spaceBelow > 300 || spaceBelow > spaceAbove) {
+            setModalPosition({ top: buttonPos.bottom + scrollY, bottom: 'auto' });
+          } else {
+            // Otherwise position above button
+            setModalPosition({ top: 'auto', bottom: windowHeight - buttonPos.top + 10 });
+          }
+        } else {
+          // Reset for desktop
+          setModalPosition({ top: 'auto', bottom: 'auto' });
+        }
+      }, 10);
     }
   };
 
   return (
     <div className="relative">
       <button 
+        id="file-manager-toggle-btn"
         onClick={toggleOpen}
         className="flex items-center px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         title={`Archivo activo: ${activeFile ? getFileFriendlyName(activeFile) : 'Ninguno'}`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 sm:mr-2" viewBox="0 0 20 20" fill="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 sm:mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clipRule="evenodd" />
           <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
         </svg>
         {displayedActiveFile ? (
-          <span className="truncate max-w-[100px] sm:max-w-[150px] inline-block">
+          <span className="truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px] inline-block">
             {displayedActiveFile}
           </span>
         ) : (
@@ -268,13 +316,22 @@ export default function FileManager({ onFileChange }) {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 right-0 w-full sm:w-96 md:w-[500px] bg-white rounded-md shadow-lg z-50 border border-gray-200 max-h-[80vh] overflow-y-auto">
-          <div className="p-4">
+        <div 
+          className="fixed sm:absolute sm:top-full sm:right-0 bg-white rounded-md shadow-lg z-50 border border-gray-200 max-h-[80vh] overflow-y-auto sm:mt-2 sm:w-96 md:w-[500px]" 
+          style={{
+            top: modalPosition.top !== 'auto' ? `${modalPosition.top}px` : 'auto',
+            bottom: modalPosition.bottom !== 'auto' ? `${modalPosition.bottom}px` : 'auto',
+            left: window.innerWidth < 640 ? '8px' : 'auto',
+            right: window.innerWidth < 640 ? '8px' : 'auto',
+            width: window.innerWidth < 640 ? 'calc(100% - 16px)' : 'auto',
+          }}
+        >
+          <div className="p-3 sm:p-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">Gestión de archivos</h3>
               <button 
                 onClick={toggleOpen}
-                className="text-gray-400 hover:text-gray-500"
+                className="text-gray-400 hover:text-gray-500 p-1"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -496,13 +553,13 @@ export default function FileManager({ onFileChange }) {
                 <table className="min-w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-3/5">
+                      <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[65%] sm:w-3/5">
                         ARCHIVO
                       </th>
-                      <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
+                      <th className="hidden sm:table-cell px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
                         TAMAÑO
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
+                      <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[35%] sm:w-1/5">
                         ACCIONES
                       </th>
                     </tr>
@@ -510,84 +567,155 @@ export default function FileManager({ onFileChange }) {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {files.length === 0 ? (
                       <tr>
-                        <td colSpan="3" className="px-4 py-3 text-center text-sm text-gray-500">
+                        <td colSpan="3" className="px-3 sm:px-4 py-3 text-center text-sm text-gray-500">
                           No hay archivos disponibles
                         </td>
                       </tr>
                     ) : (
                       files.map((file) => (
                         <tr key={file.name} className={activeFile === file.name ? 'bg-blue-50' : ''}>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          <td className="px-3 sm:px-4 py-3 text-sm font-medium text-gray-900">
                             <div className="flex flex-col">
                               <div className="flex items-center">
                                 {file.friendly_name && file.friendly_name !== file.name ? (
                                   <>
-                                    <span className="font-medium break-words">{file.friendly_name}</span>
+                                    <span className="font-medium break-words line-clamp-2">{file.friendly_name}</span>
                                     <span className="ml-1 text-xs text-gray-500 hidden sm:inline">({file.name})</span>
                                   </>
                                 ) : (
-                                  <span className="break-words">{file.name}</span>
+                                  <span className="break-words line-clamp-2">{file.name}</span>
                                 )}
                                 {activeFile === file.name && (
-                                  <span className="ml-2 text-xs font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                                  <span className="ml-2 text-xs font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded flex-shrink-0">
                                     Activo
                                   </span>
                                 )}
                               </div>
                               {file.description && (
-                                <span className="text-xs text-gray-500 mt-1 break-words max-w-[200px] sm:max-w-[300px]">
+                                <span className="text-xs text-gray-500 mt-1 break-words line-clamp-2 max-w-[180px] sm:max-w-[300px]">
                                   {file.description}
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          <td className="hidden sm:table-cell px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {formatSize(file.size_kb)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">
+                          <td className="px-3 sm:px-4 py-3 text-sm text-gray-500">
                             <div className="flex justify-end space-x-1 sm:space-x-2">
-                              {/* Mobile dropdown menu */}
+                              {/* Mobile dropdown menu with improved positioning */}
                               <div className="relative sm:hidden">
                                 <button 
-                                  className="p-1 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100"
+                                  className="p-2 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100"
                                   onClick={(e) => {
                                     e.preventDefault();
                                     const dropdown = e.currentTarget.nextElementSibling;
                                     dropdown.classList.toggle('hidden');
+                                    
+                                    // Close any other open dropdowns
+                                    document.querySelectorAll('.file-action-dropdown').forEach(el => {
+                                      if (el !== dropdown) {
+                                        el.classList.add('hidden');
+                                      }
+                                    });
+                                    
+                                    // Adjust dropdown position to ensure it's visible
+                                    setTimeout(() => {
+                                      const rect = dropdown.getBoundingClientRect();
+                                      const viewportWidth = window.innerWidth;
+                                      const viewportHeight = window.innerHeight;
+                                      const buttonRect = e.currentTarget.getBoundingClientRect();
+                                      
+                                      // Position dropdown directly underneath the button in mobile view
+                                      if (window.innerWidth < 640) {
+                                        // Position on left side of the viewport
+                                        dropdown.style.left = Math.max(5, buttonRect.left - 100) + 'px';
+                                        dropdown.style.right = 'auto';
+                                        dropdown.style.top = (buttonRect.bottom + 5) + 'px';
+                                        dropdown.style.bottom = 'auto';
+                                      } else {
+                                        // Desktop positioning logic
+                                        // Check if dropdown would go off-screen to the right
+                                        if (rect.right > viewportWidth - 10) {
+                                          dropdown.style.right = '0';
+                                          dropdown.style.left = 'auto';
+                                        } else {
+                                          dropdown.style.right = 'auto';
+                                          dropdown.style.left = '0';
+                                        }
+                                        
+                                        // Check if dropdown would go off-screen at the bottom
+                                        if (rect.bottom > viewportHeight - 10) {
+                                          // Position above the button if it would go off-screen at the bottom
+                                          dropdown.style.bottom = `${buttonRect.height}px`;
+                                          dropdown.style.top = 'auto';
+                                        } else {
+                                          dropdown.style.top = '100%';
+                                          dropdown.style.bottom = 'auto';
+                                          dropdown.style.marginRight = '0';
+                                        }
+                                      }
+                                    }, 10);
                                   }}
+                                  aria-label="Menú de acciones para archivo"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                   </svg>
                                 </button>
-                                <div className="hidden absolute right-0 z-10 mt-2 bg-white border border-gray-200 rounded shadow-lg w-48" style={{ right: '0', left: 'auto' }}>
+                                {/* Fixed position dropdown with improved mobile styling */}
+                                <div className="hidden fixed sm:absolute z-50 bg-white border border-gray-200 rounded shadow-lg file-action-dropdown" style={{ width: '110px' }}>
                                   <div className="py-1">
                                     <button
                                       onClick={() => viewFileInfo(file.name)}
-                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                                     >
-                                      Ver información
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      <span>Ver</span>
                                     </button>
                                     <button
                                       onClick={() => startEditingFriendlyName(file.name)}
-                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                                     >
-                                      Editar nombre
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                      <span>Editar</span>
                                     </button>
                                     {activeFile !== file.name && (
                                       <>
                                         <button
                                           onClick={() => handleActivateFile(file.name)}
                                           disabled={processingFile === file.name}
-                                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 flex items-center"
                                         >
-                                          {processingFile === file.name ? 'Activando...' : 'Activar archivo'}
+                                          {processingFile === file.name ? (
+                                            <>
+                                              <svg className="animate-spin h-4 w-4 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                              </svg>
+                                              <span>Activando</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                              </svg>
+                                              <span>Activar</span>
+                                            </>
+                                          )}
                                         </button>
                                         <button
                                           onClick={() => handleDeleteFile(file.name)}
-                                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                                          className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
                                         >
-                                          Eliminar archivo
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                          </svg>
+                                          <span>Eliminar</span>
                                         </button>
                                       </>
                                     )}
@@ -597,61 +725,61 @@ export default function FileManager({ onFileChange }) {
                               
                               {/* Desktop actions - compact icons with tooltips */}
                               <div className="hidden sm:flex sm:items-center sm:space-x-1">
-                                <button
-                                  onClick={() => viewFileInfo(file.name)}
+                              <button
+                                onClick={() => viewFileInfo(file.name)}
                                   className="p-1 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100"
-                                  title="Ver información"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                </button>
-                                
-                                <button
-                                  onClick={() => startEditingFriendlyName(file.name)}
+                                title="Ver información"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </button>
+                              
+                              <button
+                                onClick={() => startEditingFriendlyName(file.name)}
                                   className="p-1 text-blue-600 hover:text-blue-900 rounded-full hover:bg-blue-50"
-                                  title="Editar nombre"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                                
-                                {activeFile !== file.name ? (
-                                  <>
-                                    <button
-                                      onClick={() => handleActivateFile(file.name)}
-                                      disabled={processingFile === file.name}
+                                title="Editar nombre"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              
+                              {activeFile !== file.name ? (
+                                <>
+                                  <button
+                                    onClick={() => handleActivateFile(file.name)}
+                                    disabled={processingFile === file.name}
                                       className={`p-1 text-green-600 hover:text-green-900 rounded-full hover:bg-green-50 ${
-                                        processingFile === file.name ? 'opacity-50 cursor-not-allowed' : ''
-                                      }`}
-                                      title="Activar archivo"
-                                    >
-                                      {processingFile === file.name ? (
-                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                      ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                      )}
-                                    </button>
-                                  
-                                    <button
-                                      onClick={() => handleDeleteFile(file.name)}
-                                      className="p-1 text-red-600 hover:text-red-900 rounded-full hover:bg-red-50"
-                                      title="Eliminar archivo"
-                                    >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      processingFile === file.name ? 'opacity-50 cursor-not-allowed' : ''
+                                    }`}
+                                    title="Activar archivo"
+                                  >
+                                    {processingFile === file.name ? (
+                                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                       </svg>
-                                    </button>
-                                  </>
-                                ) : (
-                                  <span className="text-gray-400 px-2">Activo</span>
-                                )}
+                                    ) : (
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                
+                                  <button
+                                    onClick={() => handleDeleteFile(file.name)}
+                                      className="p-1 text-red-600 hover:text-red-900 rounded-full hover:bg-red-50"
+                                    title="Eliminar archivo"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-gray-400 px-2">Activo</span>
+                              )}
                               </div>
                             </div>
                           </td>
