@@ -70,7 +70,21 @@ export default function AnalysisPage() {
       <div className="bg-blue-600 shadow-md">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold text-white">Análisis de Datos CIS</h1>
+            {/* Menu button integrated into header for mobile */}
+            <div className="flex items-center">
+              {!isSidebarOpen && (
+                <button 
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="md:hidden mr-3 text-white p-2 rounded-lg"
+                  aria-label="Abrir menú de variables"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              )}
+              <h1 className="text-xl font-bold text-white">Análisis de Datos CIS</h1>
+            </div>
             <div className="flex space-x-4">
               <FileManager onFileChange={handleFileChange} />
               <Link to="/" className="text-white hover:text-blue-200">
@@ -82,19 +96,6 @@ export default function AnalysisPage() {
       </div>
 
       <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col md:flex-row">
-        {/* Botón de menú móvil - ahora solo visible cuando el sidebar está cerrado */}
-        {!isSidebarOpen && (
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="md:hidden fixed top-4 left-4 z-50 bg-white p-2 rounded-lg shadow-lg"
-            aria-label="Abrir menú de variables"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        )}
-
         {/* Sidebar/Drawer */}
         <aside className={`
           md:w-1/4 bg-white shadow-lg
@@ -151,7 +152,7 @@ export default function AnalysisPage() {
 
         {/* Main content */}
         <main className="flex-1 p-4 md:p-8">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6 mt-12 md:mt-0">
+          <h1 className="text-2xl md:text-3xl font-bold mb-6 mt-4 md:mt-0">
             Visualización del CIS
           </h1>
 
