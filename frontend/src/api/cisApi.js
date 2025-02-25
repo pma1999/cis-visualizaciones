@@ -1,4 +1,4 @@
-const API_URL = "https://cis-backend-zlsi.onrender.com";
+const API_URL = "https://cis-visualizaciones-production.up.railway.app";
 const cache = {};
 
 async function fetchWithErrorHandling(url, options = {}) {
