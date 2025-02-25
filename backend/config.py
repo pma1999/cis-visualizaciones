@@ -15,6 +15,18 @@ DATA_DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"
 # Archivo de configuración persistente
 CONFIG_FILE = os.path.join(DATA_DIRECTORY, "config.json")
 
+# Default friendly names for files - Nombres amigables predeterminados para archivos
+DEFAULT_FRIENDLY_NAMES = {
+    "3490.sav": "Participación política",
+    "3492.sav": "CIS Enero"
+}
+
+# Default file descriptions - Descripciones predeterminadas para archivos
+DEFAULT_FILE_DESCRIPTIONS = {
+    "3490.sav": "Estudio sobre participación política en España",
+    "3492.sav": "Barómetro CIS mes de Enero"
+}
+
 # Función para leer la configuración persistente
 def get_persistent_config():
     if os.path.exists(CONFIG_FILE):
@@ -107,3 +119,79 @@ def setup_logging():
 
 # Initialize logger
 logger = setup_logging()
+
+# Utility functions for file friendly names
+def get_file_friendly_names():
+    """Get a dictionary of filename to friendly name mappings"""
+    config = get_persistent_config()
+    
+    # Initialize with defaults if doesn't exist
+    if "file_friendly_names" not in config:
+        config["file_friendly_names"] = {}
+    
+    # Aplicar nombres predeterminados si no existen en la configuración
+    friendly_names = config.get("file_friendly_names", {})
+    
+    # Combinar con los nombres predeterminados (sin sobrescribir los personalizados)
+    for filename, default_name in DEFAULT_FRIENDLY_NAMES.items():
+        if filename not in friendly_names:
+            friendly_names[filename] = default_name
+    
+    return friendly_names
+
+def set_file_friendly_name(filename, friendly_name):
+    """Set a friendly name for a file"""
+    config = get_persistent_config()
+    
+    # Initialize if doesn't exist
+    if "file_friendly_names" not in config:
+        config["file_friendly_names"] = {}
+    
+    # Set the friendly name
+    config["file_friendly_names"][filename] = friendly_name
+    
+    # Save the updated config
+    return save_persistent_config(config)
+
+def get_file_friendly_name(filename):
+    """Get the friendly name for a file, or return the original filename if not set"""
+    friendly_names = get_file_friendly_names()
+    return friendly_names.get(filename, filename)
+
+# Functions to manage file notes/descriptions
+def get_file_descriptions():
+    """Get a dictionary of filename to description mappings"""
+    config = get_persistent_config()
+    
+    # Initialize with defaults if doesn't exist
+    if "file_descriptions" not in config:
+        config["file_descriptions"] = {}
+    
+    # Aplicar descripciones predeterminadas si no existen en la configuración
+    descriptions = config.get("file_descriptions", {})
+    
+    # Combinar con las descripciones predeterminadas (sin sobrescribir las personalizadas)
+    for filename, default_description in DEFAULT_FILE_DESCRIPTIONS.items():
+        if filename not in descriptions:
+            descriptions[filename] = default_description
+    
+    return descriptions
+
+def set_file_description(filename, description):
+    """Set a description for a file"""
+    config = get_persistent_config()
+    
+    # Initialize if doesn't exist
+    if "file_descriptions" not in config:
+        config["file_descriptions"] = {}
+    
+    # Set the description
+    config["file_descriptions"][filename] = description
+    
+    # Save the updated config
+    return save_persistent_config(config)
+
+def get_file_description(filename):
+    """Get the description for a file, or return empty string if not set"""
+    descriptions = get_file_descriptions()
+    return descriptions.get(filename, "")

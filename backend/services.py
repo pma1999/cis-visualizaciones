@@ -8,10 +8,18 @@ import shutil
 
 # Import configuration
 try:
-    from backend.config import DATA_FILE, DATA_DIRECTORY, ACTIVE_DATA_FILE, DEFAULT_DATA_FILE, ALLOWED_EXTENSIONS, logger
+    from backend.config import (
+        DATA_FILE, DATA_DIRECTORY, ACTIVE_DATA_FILE, DEFAULT_DATA_FILE, 
+        ALLOWED_EXTENSIONS, logger, get_file_friendly_name, 
+        get_file_description, save_persistent_config
+    )
 except ImportError:
     # Fallback for Railway deployment
-    from config import DATA_FILE, DATA_DIRECTORY, ACTIVE_DATA_FILE, DEFAULT_DATA_FILE, ALLOWED_EXTENSIONS, logger
+    from config import (
+        DATA_FILE, DATA_DIRECTORY, ACTIVE_DATA_FILE, DEFAULT_DATA_FILE, 
+        ALLOWED_EXTENSIONS, logger, get_file_friendly_name, 
+        get_file_description, save_persistent_config
+    )
 
 def write_debug(msg: str) -> None:
     """Write debug messages to the log file."""
@@ -59,13 +67,12 @@ def set_active_data_file(filename: str) -> Dict[str, str]:
     
     # Store in persistent configuration
     try:
-        from config import save_persistent_config
         config = {"active_file": filename}
         save_result = save_persistent_config(config)
         if not save_result:
             logger.warning("No se pudo guardar la configuración persistente")
-    except ImportError:
-        logger.warning("No se pudo importar save_persistent_config")
+    except Exception as e:
+        logger.warning(f"No se pudo guardar la configuración persistente: {str(e)}")
     
     logger.info(f"Active data file set to: {filename}")
     return {"success": True, "file": filename}
@@ -85,9 +92,15 @@ def list_available_files() -> List[Dict[str, Any]]:
                 file_stat = os.stat(file_path)
                 size_kb = file_stat.st_size / 1024  # Convert to KB
                 
+                # Get friendly name and description
+                friendly_name = get_file_friendly_name(filename)
+                description = get_file_description(filename)
+                
                 # Add file info to list
                 files.append({
                     "name": filename,
+                    "friendly_name": friendly_name,
+                    "description": description,
                     "size_kb": round(size_kb, 2),
                     "last_modified": file_stat.st_mtime,
                     "active": filename == get_active_data_file()

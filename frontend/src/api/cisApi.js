@@ -385,6 +385,71 @@ export async function deleteFile(filename) {
 }
 
 /**
+ * Update a file's friendly name
+ * @param {string} filename - Name of the file
+ * @param {string} friendlyName - New friendly name for the file
+ * @returns {Promise<Object>} Update result
+ */
+export async function updateFileFriendlyName(filename, friendlyName) {
+  try {
+    const data = await fetchWithErrorHandling(`${API_URL}/files/${encodeURIComponent(filename)}/friendly-name`, {
+      method: 'POST',
+      body: JSON.stringify({ friendly_name: friendlyName }),
+    });
+    
+    // Clear the cache for files to reflect new friendly name immediately
+    apiCache.remove("available_files");
+    
+    return data;
+  } catch (error) {
+    console.error("Error updating file friendly name:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update a file's description
+ * @param {string} filename - Name of the file
+ * @param {string} description - New description for the file
+ * @returns {Promise<Object>} Update result
+ */
+export async function updateFileDescription(filename, description) {
+  try {
+    const data = await fetchWithErrorHandling(`${API_URL}/files/${encodeURIComponent(filename)}/description`, {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    });
+    
+    // Clear the cache for files to reflect new description immediately
+    apiCache.remove("available_files");
+    
+    return data;
+  } catch (error) {
+    console.error("Error updating file description:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get all file metadata (friendly names and descriptions)
+ * @returns {Promise<Object>} Metadata
+ */
+export async function getFilesMetadata() {
+  const cacheKey = "files_metadata";
+  const cachedData = apiCache.get(cacheKey);
+  if (cachedData) return cachedData;
+  
+  try {
+    const data = await fetchWithErrorHandling(`${API_URL}/files/metadata`);
+    apiCache.set(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error("Error getting files metadata:", error);
+    throw error;
+  }
+}
+
+/**
  * Clear the API cache for specific pattern or completely
  * @param {string} pattern - Optional pattern to match cache keys
  */

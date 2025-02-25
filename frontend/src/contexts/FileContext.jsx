@@ -1,5 +1,5 @@
 import { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
-import { getAvailableFiles, activateFile, clearApiCache } from '../api/cisApi';
+import { getAvailableFiles, activateFile, clearApiCache, getFilesMetadata } from '../api/cisApi';
 
 // Crear el contexto
 export const FileContext = createContext();
@@ -29,6 +29,52 @@ const setStoredActiveFile = (filename) => {
   }
 };
 
+// Nuevas funciones para manejar nombres amigables por usuario
+const getStoredFriendlyNames = () => {
+  try {
+    const stored = localStorage.getItem('cis_user_friendly_names');
+    return stored ? JSON.parse(stored) : {};
+  } catch (e) {
+    console.error("Error accediendo a los nombres amigables en localStorage:", e);
+    return {};
+  }
+};
+
+const setStoredFriendlyName = (filename, friendlyName) => {
+  try {
+    const names = getStoredFriendlyNames();
+    names[filename] = friendlyName;
+    localStorage.setItem('cis_user_friendly_names', JSON.stringify(names));
+    return true;
+  } catch (e) {
+    console.error("Error guardando nombre amigable en localStorage:", e);
+    return false;
+  }
+};
+
+// Funciones para manejar descripciones por usuario
+const getStoredDescriptions = () => {
+  try {
+    const stored = localStorage.getItem('cis_user_descriptions');
+    return stored ? JSON.parse(stored) : {};
+  } catch (e) {
+    console.error("Error accediendo a las descripciones en localStorage:", e);
+    return {};
+  }
+};
+
+const setStoredDescription = (filename, description) => {
+  try {
+    const descriptions = getStoredDescriptions();
+    descriptions[filename] = description;
+    localStorage.setItem('cis_user_descriptions', JSON.stringify(descriptions));
+    return true;
+  } catch (e) {
+    console.error("Error guardando descripción en localStorage:", e);
+    return false;
+  }
+};
+
 // Proveedor del contexto
 export const FileProvider = ({ children }) => {
   const [files, setFiles] = useState([]);
@@ -40,6 +86,12 @@ export const FileProvider = ({ children }) => {
   const [lastModifiedHash, setLastModifiedHash] = useState(null);
   const pollingTimeoutRef = useRef(null);
   const isMountedRef = useRef(true);
+  
+  // Nuevos estados para nombres amigables y descripciones personalizadas
+  const [userFriendlyNames, setUserFriendlyNames] = useState(getStoredFriendlyNames());
+  const [userDescriptions, setUserDescriptions] = useState(getStoredDescriptions());
+  const [defaultFriendlyNames, setDefaultFriendlyNames] = useState({});
+  const [defaultDescriptions, setDefaultDescriptions] = useState({});
   
   // Actualizar localStorage cuando cambia el archivo activo
   useEffect(() => {
@@ -55,6 +107,44 @@ export const FileProvider = ({ children }) => {
       .sort()
       .join('|');
   }, []);
+  
+  // Función para obtener el nombre amigable de un archivo
+  const getFileFriendlyName = useCallback((filename) => {
+    if (!filename) return '';
+    
+    // 1. Primero buscar en los nombres personalizados del usuario
+    if (userFriendlyNames[filename]) {
+      return userFriendlyNames[filename];
+    }
+    
+    // 2. Si no hay personalización, buscar en los nombres por defecto del servidor
+    const file = files.find(f => f.name === filename);
+    if (file && file.friendly_name && file.friendly_name !== filename) {
+      return file.friendly_name;
+    }
+    
+    // 3. Si no hay ningún nombre amigable, devolver el nombre original
+    return filename;
+  }, [files, userFriendlyNames]);
+  
+  // Función para obtener la descripción de un archivo
+  const getFileDescription = useCallback((filename) => {
+    if (!filename) return '';
+    
+    // 1. Primero buscar en las descripciones personalizadas del usuario
+    if (userDescriptions[filename]) {
+      return userDescriptions[filename];
+    }
+    
+    // 2. Si no hay personalización, buscar en las descripciones por defecto del servidor
+    const file = files.find(f => f.name === filename);
+    if (file && file.description) {
+      return file.description;
+    }
+    
+    // 3. Si no hay ninguna descripción, devolver cadena vacía
+    return '';
+  }, [files, userDescriptions]);
   
   // Función para cargar la lista de archivos optimizada con throttling y detección de cambios
   const loadFiles = useCallback(async (forceFetch = false) => {
@@ -251,6 +341,50 @@ export const FileProvider = ({ children }) => {
     };
   }, [loadFiles, setupPolling]);
   
+  // Función para actualizar el nombre amigable personalizado
+  const updateUserFriendlyName = useCallback((filename, friendlyName) => {
+    // Actualizar el estado
+    setUserFriendlyNames(prev => ({
+      ...prev,
+      [filename]: friendlyName
+    }));
+    
+    // Guardar en localStorage
+    return setStoredFriendlyName(filename, friendlyName);
+  }, []);
+  
+  // Función para actualizar la descripción personalizada
+  const updateUserDescription = useCallback((filename, description) => {
+    // Actualizar el estado
+    setUserDescriptions(prev => ({
+      ...prev,
+      [filename]: description
+    }));
+    
+    // Guardar en localStorage
+    return setStoredDescription(filename, description);
+  }, []);
+  
+  // Cargar metadatos del servidor (nombres amigables y descripciones por defecto)
+  const loadMetadata = useCallback(async () => {
+    try {
+      const metadata = await getFilesMetadata();
+      if (metadata && metadata.friendly_names) {
+        setDefaultFriendlyNames(metadata.friendly_names);
+      }
+      if (metadata && metadata.descriptions) {
+        setDefaultDescriptions(metadata.descriptions);
+      }
+    } catch (err) {
+      console.error('Error loading file metadata:', err);
+    }
+  }, []);
+  
+  // Cargar metadatos al iniciar
+  useEffect(() => {
+    loadMetadata();
+  }, [loadMetadata]);
+  
   // Valores y funciones que estarán disponibles a través del contexto
   const value = {
     files,
@@ -258,7 +392,11 @@ export const FileProvider = ({ children }) => {
     isLoading,
     error,
     loadFiles: () => loadFiles(true), // Siempre forzar carga cuando se llama explícitamente
-    activateFile: handleActivateFile
+    activateFile: handleActivateFile,
+    getFileFriendlyName,
+    getFileDescription,
+    updateUserFriendlyName,
+    updateUserDescription
   };
   
   return (

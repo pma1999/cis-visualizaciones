@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 from typing import Dict, List, Any
+from pydantic import BaseModel
 
 # Import configuration and services
 try:
@@ -17,7 +18,16 @@ try:
         CORS_ALLOW_HEADERS,
         ALLOWED_EXTENSIONS,
         MAX_UPLOAD_SIZE,
-        logger
+        DATA_DIRECTORY,
+        logger,
+        get_file_friendly_names, 
+        set_file_friendly_name, 
+        get_file_friendly_name,
+        get_file_descriptions,
+        set_file_description,
+        get_file_description,
+        DEFAULT_FRIENDLY_NAMES,
+        DEFAULT_FILE_DESCRIPTIONS,
     )
     from backend.services import (
         cargar_datos, 
@@ -45,7 +55,16 @@ except ImportError:
         CORS_ALLOW_HEADERS,
         ALLOWED_EXTENSIONS,
         MAX_UPLOAD_SIZE,
-        logger
+        DATA_DIRECTORY,
+        logger,
+        get_file_friendly_names, 
+        set_file_friendly_name, 
+        get_file_friendly_name,
+        get_file_descriptions,
+        set_file_description,
+        get_file_description,
+        DEFAULT_FRIENDLY_NAMES,
+        DEFAULT_FILE_DESCRIPTIONS,
     )
     from services import (
         cargar_datos, 
@@ -77,6 +96,42 @@ app.add_middleware(
     allow_methods=CORS_ALLOW_METHODS,
     allow_headers=CORS_ALLOW_HEADERS,
 )
+
+# Inicialización de la aplicación
+@app.on_event("startup")
+async def initialize_app():
+    """Initialize application data and defaults."""
+    logger.info("Initializing application...")
+    
+    # Asegurar que los nombres amigables predeterminados estén aplicados
+    friendly_names = get_file_friendly_names()
+    
+    # Verificar archivos predeterminados en el sistema
+    files_data = list_available_files()
+    available_files = [file["name"] for file in files_data]
+    
+    # Registrar cambios realizados
+    changes_made = False
+    
+    # Aplicar nombres amigables predeterminados para archivos existentes
+    for filename, default_name in DEFAULT_FRIENDLY_NAMES.items():
+        if filename in available_files and filename not in friendly_names:
+            logger.info(f"Applying default friendly name for {filename}: {default_name}")
+            set_file_friendly_name(filename, default_name)
+            changes_made = True
+    
+    # Aplicar descripciones predeterminadas
+    descriptions = get_file_descriptions()
+    for filename, default_desc in DEFAULT_FILE_DESCRIPTIONS.items():
+        if filename in available_files and filename not in descriptions:
+            logger.info(f"Applying default description for {filename}")
+            set_file_description(filename, default_desc)
+            changes_made = True
+    
+    if changes_made:
+        logger.info("Default friendly names and descriptions applied successfully")
+    else:
+        logger.info("No changes needed for friendly names and descriptions")
 
 # Error handler
 @app.exception_handler(Exception)
@@ -241,3 +296,68 @@ def delete_data_file(filename: str):
     except Exception as e:
         logger.error(f"Error deleting file {filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al eliminar el archivo: {str(e)}")
+
+# Add these new models for request validation
+class FileNameUpdate(BaseModel):
+    friendly_name: str
+
+class FileDescriptionUpdate(BaseModel):
+    description: str
+
+# Add these new endpoints before the end of the file
+
+@app.get("/files/metadata")
+def get_files_metadata():
+    """Get all file friendly names and descriptions."""
+    try:
+        friendly_names = get_file_friendly_names()
+        descriptions = get_file_descriptions()
+        return {
+            "friendly_names": friendly_names,
+            "descriptions": descriptions
+        }
+    except Exception as e:
+        logger.error(f"Error in /files/metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al obtener los metadatos de archivos")
+
+@app.post("/files/{filename}/friendly-name")
+def update_file_friendly_name(filename: str, data: FileNameUpdate):
+    """Update the friendly name for a file."""
+    try:
+        # Verify file exists
+        file_path = os.path.join(DATA_DIRECTORY, filename)
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+        # Update friendly name
+        result = set_file_friendly_name(filename, data.friendly_name)
+        if not result:
+            raise HTTPException(status_code=500, detail="Error al guardar el nombre amigable")
+        
+        return {"success": True, "filename": filename, "friendly_name": data.friendly_name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating friendly name for {filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar el nombre amigable")
+
+@app.post("/files/{filename}/description")
+def update_file_description(filename: str, data: FileDescriptionUpdate):
+    """Update the description for a file."""
+    try:
+        # Verify file exists
+        file_path = os.path.join(DATA_DIRECTORY, filename)
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+        # Update description
+        result = set_file_description(filename, data.description)
+        if not result:
+            raise HTTPException(status_code=500, detail="Error al guardar la descripción")
+        
+        return {"success": True, "filename": filename, "description": data.description}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating description for {filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar la descripción")
