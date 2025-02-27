@@ -67,9 +67,14 @@ debug.log
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
 
 # Vercel
 .vercel/
+# Mantener los ejemplos, ignorar las configuraciones reales
+railway.json
+!railway.example.json
+!vercel.example.json
 
 # Misc
 .DS_Store

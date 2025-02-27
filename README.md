@@ -1,109 +1,189 @@
-# CIS Visualizaciones
+# Visualizador de Datos CIS
 
-Una aplicación web para visualizar y analizar datos del Centro de Investigaciones Sociológicas (CIS).
+![Estado](https://img.shields.io/badge/estado-desarrollo-green)
+![Licencia](https://img.shields.io/badge/licencia-MIT-blue)
+![Versión](https://img.shields.io/badge/versión-1.0.0-orange)
 
-## Descripción
+Una aplicación web moderna para explorar, analizar y visualizar datos sociológicos del Centro de Investigaciones Sociológicas (CIS) de España.
 
-Este proyecto proporciona herramientas para visualizar y analizar datos de encuestas del CIS. Permite explorar variables, crear tablas de frecuencias, generar gráficos y realizar análisis bivariados.
+![Captura de pantalla de la aplicación](https://via.placeholder.com/800x400?text=Visualizador+de+Datos+CIS)
 
-## Estructura del Proyecto
+## 🔍 Demo en vivo
 
-El proyecto está dividido en dos partes principales:
+Puedes probar una versión en vivo de la aplicación aquí: [https://cis-visualizaciones.vercel.app/](https://cis-visualizaciones.vercel.app/)
 
-- **Backend**: API REST desarrollada con FastAPI para procesar y servir los datos.
-- **Frontend**: Aplicación web desarrollada con React para visualizar los datos.
+## 🌟 Características
 
-## Requisitos
+- **Análisis univariado y bivariado**: Estudia una variable o examina relaciones entre dos variables.
+- **Visualizaciones interactivas**: Gráficos dinámicos de barras, líneas, tarta, mapas de árbol y barras apiladas.
+- **Tablas de frecuencia y contingencia**: Visualiza distribuciones y relaciones entre variables con datos precisos.
+- **Gestión de archivos de datos**: Carga, guarda y gestiona tus propios archivos de datos SPSS (.sav).
+- **Almacenamiento local**: Trabaja con archivos localmente sin necesidad de servidor en línea.
+- **Limpieza de datos**: Excluye valores específicos del análisis para resultados más precisos.
+- **Modo oscuro/claro**: Interfaz adaptable a tus preferencias visuales.
+- **Diseño responsivo**: Funciona perfectamente en dispositivos móviles, tablets y escritorio.
 
-### Backend
-- Python 3.8+
-- FastAPI
-- Pandas
-- Pyreadstat
-- Uvicorn
+## 🚀 Tecnologías
 
 ### Frontend
-- Node.js 14+
-- React 18
-- Vite
-- React Router
-- MUI (Material-UI)
-- Recharts
-
-## Instalación
+- **React**: Biblioteca JavaScript para construir interfaces de usuario
+- **Vite**: Entorno de desarrollo ultrarrápido
+- **Tailwind CSS**: Framework CSS para diseño moderno y responsivo
+- **Chart.js y Recharts**: Bibliotecas para visualizaciones de datos
+- **React Router**: Navegación fluida entre componentes
 
 ### Backend
+- **FastAPI**: Framework web de Python de alto rendimiento
+- **Pandas**: Análisis de datos y manipulación
+- **Pyreadstat**: Lectura de archivos SPSS (.sav)
+- **Uvicorn**: Servidor ASGI para servir la API
 
-1. Navega al directorio del backend:
-   ```
-   cd backend
+## 🛠️ Instalación
+
+### Requisitos previos
+- Python 3.8 o superior
+- Node.js 18.x o superior
+- npm o yarn
+
+### Configuración del Backend
+
+1. Clona el repositorio:
+   ```bash
+   git clone https://github.com/tu-usuario/cis-visualizaciones.git
+   cd cis-visualizaciones
    ```
 
-2. Crea un entorno virtual:
-   ```
+2. Crea un entorno virtual y actívalo:
+   ```bash
    python -m venv env
+   # En Windows:
+   env\Scripts\activate
+   # En macOS/Linux:
+   source env/bin/activate
    ```
 
-3. Activa el entorno virtual:
-   - Windows: `env\Scripts\activate`
-   - Linux/Mac: `source env/bin/activate`
-
-4. Instala las dependencias:
-   ```
-   pip install -r requirements.txt
+3. Instala las dependencias:
+   ```bash
+   pip install -r backend/requirements.txt
    ```
 
-5. Inicia el servidor:
+4. Configura las variables de entorno:
+   ```bash
+   cp backend/.env.example backend/.env
+   # Edita el archivo .env según tus necesidades
    ```
+
+5. Inicia el servidor de desarrollo:
+   ```bash
+   cd backend
    uvicorn main:app --reload
    ```
 
-### Frontend
+### Configuración del Frontend
 
-1. Navega al directorio del frontend:
-   ```
-   cd frontend
+1. En otra terminal, navega a la carpeta del frontend:
+   ```bash
+   cd cis-visualizaciones/frontend
    ```
 
 2. Instala las dependencias:
-   ```
+   ```bash
    npm install
+   # o
+   yarn install
    ```
 
-3. Inicia el servidor de desarrollo:
+3. Configura las variables de entorno:
+   ```bash
+   cp frontend/.env.example frontend/.env
+   # Edita el archivo .env según tus necesidades
    ```
+
+4. Inicia el servidor de desarrollo:
+   ```bash
    npm run dev
+   # o
+   yarn dev
    ```
 
-## Uso
+5. Abre tu navegador en la dirección indicada (normalmente http://localhost:5173)
 
-1. Accede a la aplicación web en `http://localhost:5173/`
-2. Selecciona las variables que deseas analizar
-3. Explora los diferentes tipos de visualizaciones disponibles
+## 📊 Uso
 
-## API
+### Carga de datos
+1. Utiliza el gestor de archivos en la parte superior para cargar un nuevo archivo .sav o seleccionar uno existente.
+2. La aplicación soporta archivos en formato SPSS (.sav).
 
-El backend proporciona los siguientes endpoints:
+### Análisis Univariado
+1. Selecciona una variable del panel lateral.
+2. Elige el tipo de gráfico (barras, líneas, tarta).
+3. Ajusta el orden (por código o frecuencia).
+4. Opcionalmente, excluye valores específicos para un análisis más limpio.
 
-- `GET /`: Información básica de la API
-- `GET /datos`: Obtener todos los datos
-- `GET /variables`: Listar todas las variables disponibles
-- `GET /datos/{variable}`: Obtener datos para una variable específica
-- `GET /distribucion/{variable}`: Obtener distribución de frecuencias para una variable
-- `GET /metadatos`: Obtener metadatos de las variables
-- `GET /contingencia/{variable1}/{variable2}`: Obtener tabla de contingencia para dos variables
+### Análisis Bivariado
+1. Selecciona una variable principal.
+2. Cambia el tipo de análisis a "Bivariado".
+3. Selecciona una variable secundaria.
+4. Explora la tabla de contingencia y las visualizaciones.
 
-## Despliegue
+### Limpieza de Datos
+- Usa las opciones de limpieza para excluir categorías específicas.
+- Los cambios se reflejan inmediatamente en las visualizaciones y tablas.
 
-El proyecto está configurado para ser desplegado en:
+## 🚀 Despliegue
 
-- Backend: Railway
-- Frontend: Vercel
+Para instrucciones detalladas sobre cómo desplegar este proyecto en diferentes plataformas, consulta el archivo [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Licencia
+## 📋 Estructura del Proyecto
 
-Este proyecto está bajo licencia MIT.
+```
+cis-visualizaciones/
+├── backend/                   # Servidor API
+│   ├── config.py              # Configuración y variables globales
+│   ├── data/                  # Directorio para archivos .sav
+│   ├── main.py                # Puntos de entrada de la API
+│   ├── models.py              # Modelos de datos
+│   ├── requirements.txt       # Dependencias de Python
+│   └── services.py            # Lógica de negocio
+├── frontend/                  # Aplicación React
+│   ├── public/                # Archivos estáticos
+│   ├── src/                   
+│   │   ├── api/               # Cliente API
+│   │   ├── components/        # Componentes React
+│   │   ├── utils/             # Utilidades
+│   │   ├── App.jsx            # Componente raíz
+│   │   └── main.jsx           # Punto de entrada
+│   ├── package.json           # Dependencias de Node.js
+│   └── vite.config.js         # Configuración de Vite
+├── DEPLOYMENT.md              # Guía detallada de despliegue
+├── vercel.example.json        # Ejemplo de configuración para Vercel
+├── railway.example.json       # Ejemplo de configuración para Railway
+└── README.md                  # Este archivo
+```
 
-## Autores
+## 🔒 Almacenamiento Local
 
-- Equipo de desarrollo del proyecto CIS Visualizaciones 
+La aplicación puede funcionar completamente con almacenamiento local:
+
+- Los archivos .sav se pueden guardar en el navegador usando IndexedDB.
+- Esta característica es útil cuando no se puede conectar al servidor o durante el desarrollo.
+- Los datos nunca salen de tu navegador, lo que garantiza privacidad.
+
+## 🤝 Contribuciones
+
+Las contribuciones son bienvenidas. Para contribuir:
+
+1. Haz un fork del proyecto
+2. Crea una rama para tu característica (`git checkout -b feature/amazing-feature`)
+3. Haz commit de tus cambios (`git commit -m 'Add amazing feature'`)
+4. Haz push a la rama (`git push origin feature/amazing-feature`)
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto está licenciado bajo la Licencia MIT - vea el archivo LICENSE para más detalles.
+
+## 👏 Reconocimientos
+
+- Centro de Investigaciones Sociológicas (CIS) por proveer los datos.
+- Comunidad de código abierto de Python y JavaScript por sus excelentes herramientas. 
