@@ -128,10 +128,6 @@ git push heroku main
 
 Puedes crear un nuevo servicio y seleccionar tu repositorio, configurando los comandos de construcción y despliegue según la documentación proporcionada aquí.
 
-### Docker
-
-En la raíz del proyecto hay archivos Dockerfile para facilitar la containerización.
-
 ## Variables de Entorno
 
 ### Variables Críticas del Frontend
