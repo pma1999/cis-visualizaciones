@@ -14,6 +14,21 @@ export default function LandingPage() {
           <p className="text-xl mb-8">
             Explora y visualiza datos del Centro de Investigaciones Sociológicas de manera interactiva
           </p>
+
+          {/* Disclaimer */}
+          <div className="bg-white/20 backdrop-blur-sm p-4 rounded-lg mb-8 mx-auto max-w-3xl">
+            <p className="text-sm text-white">
+              <span className="font-semibold">AVISO LEGAL:</span> Esta herramienta no es una página oficial del Centro de Investigaciones Sociológicas (CIS). 
+              Se trata de una aplicación independiente que utiliza y procesa los archivos de datos (.sav) publicados por el CIS en su sitio web oficial{' '}
+              <a href="https://www.cis.es/catalogo-estudios/resultados-definidos/buscador-estudios" 
+                 target="_blank" 
+                 rel="noopener noreferrer" 
+                 className="underline font-medium hover:text-blue-200 transition-colors">
+                www.cis.es
+              </a>.
+            </p>
+          </div>
+
           <Link
             to="/analysis"
             className="bg-white text-blue-700 px-8 py-3 rounded-lg font-semibold text-lg hover:bg-blue-50 transition duration-300"

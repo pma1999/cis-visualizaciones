@@ -31,6 +31,9 @@ export default function AnalysisPage() {
   
   // Estado para modo claro/oscuro
   const [darkMode, setDarkMode] = useState(false);
+  
+  // Estado para controlar si se muestra el disclaimer
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
 
   // Efecto para reiniciar exclusiones cuando cambian variables
   useEffect(() => {
@@ -173,6 +176,38 @@ export default function AnalysisPage() {
           </div>
         </div>
       </header>
+
+      {/* Disclaimer Banner */}
+      {showDisclaimer && (
+        <div className={`${darkMode ? 'bg-blue-900/80' : 'bg-blue-100'} border-b ${darkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+          <div className="max-w-7xl mx-auto px-4 py-3 relative">
+            <div className="flex items-start sm:items-center justify-between">
+              <div className="flex-1 pr-10">
+                <p className={`text-xs sm:text-sm ${darkMode ? 'text-blue-100' : 'text-blue-800'}`}>
+                  <span className="font-semibold mr-1">AVISO LEGAL:</span>
+                  Esta herramienta no es una página oficial del Centro de Investigaciones Sociológicas (CIS). 
+                  Se trata de una aplicación independiente que utiliza y procesa los archivos de datos (.sav) publicados por el CIS en su 
+                  <a href="https://www.cis.es/catalogo-estudios/resultados-definidos/buscador-estudios" 
+                     target="_blank" 
+                     rel="noopener noreferrer" 
+                     className={`${darkMode ? 'text-blue-300' : 'text-blue-600'} mx-1 underline hover:text-blue-500`}>
+                    sitio web oficial
+                  </a>.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowDisclaimer(false)}
+                className={`absolute right-2 top-3 ${darkMode ? 'text-blue-200 hover:text-blue-100' : 'text-blue-600 hover:text-blue-800'}`}
+                aria-label="Cerrar aviso"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="min-h-[calc(100vh-64px)] flex flex-col md:flex-row">
         {/* Panel lateral mejorado */}
