@@ -218,7 +218,7 @@ export default function FileManager({ onFileChange }) {
       await loadFiles();
       
       cancelEditing();
-      showTemporaryNotification(setNotification, 'Nombre y descripción actualizados');
+      showTemporaryNotification(setNotification, 'Personalización guardada localmente. Solo tú verás estos cambios.');
     } catch (error) {
       setError(`Error al guardar: ${error.message}`);
     } finally {

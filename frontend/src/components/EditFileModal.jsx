@@ -58,37 +58,38 @@ const EditFileModal = ({
           <textarea
             id="description"
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+            rows="3"
             value={description}
             onChange={(e) => setEditDescription(e.target.value)}
-            rows={3}
-            placeholder="Añade información adicional sobre este archivo..."
+            placeholder="Añade una descripción para este archivo"
           />
         </div>
         
-        <div className="flex justify-end gap-2">
+        <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded-md text-sm text-blue-800">
+          <p>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Estos cambios son personales y solo serán visibles para ti. Otros usuarios seguirán viendo el nombre original o sus propias personalizaciones.
+          </p>
+        </div>
+        
+        <div className="flex justify-end space-x-2">
           <button
+            type="button"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
             disabled={isSaving}
           >
             Cancelar
           </button>
           <button
+            type="button"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
             onClick={onSave}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center"
             disabled={isSaving}
           >
-            {isSaving ? (
-              <>
-                <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Guardando...
-              </>
-            ) : (
-              'Guardar'
-            )}
+            {isSaving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
       </div>

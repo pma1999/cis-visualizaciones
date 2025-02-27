@@ -369,13 +369,11 @@ export const FileProvider = ({ children }) => {
       // Guardar en localStorage
       setStoredFriendlyName(filename, friendlyName);
       
-      // Actualizar en el servidor si no es un archivo local
+      // Solo actualizar metadatos para archivos locales en IndexedDB
+      // ya no se envía al servidor para evitar afectar a otros usuarios
       if (isLocal) {
         // Para archivos locales, actualizar solo los metadatos en IndexedDB
         await updateFileFriendlyName(filename, friendlyName, true);
-      } else {
-        // Para archivos remotos, actualizar en el servidor
-        await updateFileFriendlyName(filename, friendlyName, false);
       }
       
       return { success: true };
@@ -397,13 +395,11 @@ export const FileProvider = ({ children }) => {
       // Guardar en localStorage
       setStoredDescription(filename, description);
       
-      // Actualizar en el servidor si no es un archivo local
+      // Solo actualizar metadatos para archivos locales en IndexedDB
+      // ya no se envía al servidor para evitar afectar a otros usuarios
       if (isLocal) {
         // Para archivos locales, actualizar solo los metadatos en IndexedDB
         await updateFileDescription(filename, description, true);
-      } else {
-        // Para archivos remotos, actualizar en el servidor
-        await updateFileDescription(filename, description, false);
       }
       
       return { success: true };
