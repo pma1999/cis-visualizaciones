@@ -272,28 +272,17 @@ export default function FileManager({ onFileChange }) {
 
   return (
     <div className="relative">
-      <button 
-        id="file-manager-toggle-btn"
-        onClick={toggleOpen}
-        className="flex items-center px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        title={`Archivo activo: ${activeFile ? getFileFriendlyName(activeFile) : 'Ninguno'}`}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center text-white p-1.5 sm:p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'} transition-colors`}
+        title="Gestionar archivos"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 sm:mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clipRule="evenodd" />
-          <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
+        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
         </svg>
-        {displayedActiveFile ? (
-          <span className="truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px] inline-block">
-            {displayedActiveFile}
-            {files.find(f => f.name === activeFile)?.isLocal && (
-              <span className="ml-1 text-xs bg-green-500 text-white px-1 py-0.5 rounded">Local</span>
-            )}
-          </span>
-        ) : (
-          <span>
-            Archivo
-          </span>
-        )}
+        <span className="ml-1 hidden sm:inline truncate max-w-[80px] lg:max-w-none">
+          {displayedActiveFile || "Sin archivo"}
+        </span>
       </button>
 
       {isOpen && (

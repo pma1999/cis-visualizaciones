@@ -102,43 +102,45 @@ export default function AnalysisPage() {
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       {/* Header principal */}
       <header className={`${darkMode ? 'bg-gray-800' : 'bg-gradient-to-r from-blue-600 to-blue-800'} shadow-lg`}>
-        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto py-2 sm:py-4 px-2 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             {/* Botón de menú y título */}
             <div className="flex items-center">
               {!isSidebarOpen && (
                 <button 
                   onClick={() => setIsSidebarOpen(true)}
-                  className={`mr-3 text-white p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'} transition-colors flex items-center`}
+                  className={`mr-1 sm:mr-3 text-white p-1 sm:p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'} transition-colors flex items-center`}
                   aria-label="Abrir menú de variables"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
-                  <span className="ml-2 hidden sm:inline">Variables</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:inline">Variables</span>
                 </button>
               )}
-              <h1 className="text-xl font-bold text-white">Análisis de Datos CIS</h1>
+              <h1 className="text-sm xs:text-base sm:text-xl font-bold text-white truncate">
+                <span className="hidden xs:inline">Análisis de </span>Datos CIS
+              </h1>
             </div>
             
             {/* Acciones del header */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1 sm:space-x-3">
               {/* Selector de archivos */}
               <FileManager onFileChange={handleFileChange} />
               
               {/* Botón modo oscuro */}
               <button
                 onClick={toggleDarkMode}
-                className="text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                className="text-white p-1 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
                 aria-label={darkMode ? "Activar modo claro" : "Activar modo oscuro"}
                 title={darkMode ? "Activar modo claro" : "Activar modo oscuro"}
               >
                 {darkMode ? (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                 ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                   </svg>
                 )}
@@ -147,11 +149,11 @@ export default function AnalysisPage() {
               {/* Tutorial */}
               <button
                 onClick={startTutorial}
-                className="text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                className="text-white p-1 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
                 aria-label="Iniciar tutorial"
                 title="Iniciar tutorial"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
@@ -159,11 +161,11 @@ export default function AnalysisPage() {
               {/* Botón inicio */}
               <Link 
                 to="/" 
-                className="text-white hover:text-blue-200 p-2 rounded-lg hover:bg-white/10 flex items-center transition-all duration-200"
+                className="text-white hover:text-blue-200 p-1 sm:p-2 rounded-lg hover:bg-white/10 flex items-center transition-all duration-200"
                 aria-label="Volver al inicio"
                 title="Volver al inicio"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                 </svg>
               </Link>
