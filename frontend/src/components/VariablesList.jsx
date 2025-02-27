@@ -12,7 +12,7 @@ const VariablesList = memo(({ onSelect, excludeVariable, isCompact = false, dark
   const [error, setError] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("todas");
-  const [viewMode, setViewMode] = useState("grid"); // grid o list
+  const [viewMode, setViewMode] = useState("list"); // grid o list
   const [sortMethod, setSortMethod] = useState("alphabetical"); // alphabetical, frequency, relevance
   const [favoriteVariables, setFavoriteVariables] = useState([]);
   const [recentVariables, setRecentVariables] = useState([]);
