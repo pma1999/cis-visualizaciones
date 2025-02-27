@@ -9,7 +9,11 @@ export default function ChartComponent({
   chartType = 'bar', 
   sortOrder = 'code', 
   excludedValues = [],
-  darkMode = false
+  darkMode = false,
+  isFullscreenPage = false,
+  initialZoom = 100,
+  initialAspectRatio = 1.6,
+  initialShowLegend = true
 }) {
   const [data, setData] = useState({});
   const [valueLabels, setValueLabels] = useState({});
@@ -17,18 +21,33 @@ export default function ChartComponent({
   const [error, setError] = useState(null);
   const [chartInstance, setChartInstance] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [zoom, setZoom] = useState(100);
-  const [showLegend, setShowLegend] = useState(true);
+  const [zoom, setZoom] = useState(initialZoom);
+  const [showLegend, setShowLegend] = useState(initialShowLegend);
   const [downloadFormat, setDownloadFormat] = useState('png');
   const [exporting, setExporting] = useState(false);
   const [chartOptions, setChartOptions] = useState({
     animation: true,
     responsive: true,
-    aspectRatio: 1.6
+    aspectRatio: initialAspectRatio
   });
   
   const chartRef = useRef(null);
   const chartContainer = useRef(null);
+
+  // Function to open chart in new tab
+  const openInNewTab = () => {
+    const baseUrl = window.location.origin;
+    const excludedValuesParam = excludedValues.length > 0 ? `&excludedValues1=${excludedValues.join(',')}` : '';
+    
+    // Include additional chart configuration parameters
+    const zoomParam = zoom !== 100 ? `&zoom=${zoom}` : '';
+    const aspectRatioParam = chartOptions.aspectRatio !== 1.6 ? `&aspectRatio=${chartOptions.aspectRatio}` : '';
+    const legendParam = `&showLegend=${showLegend}`;
+    
+    const url = `${baseUrl}/chart/univariate/${variable}?chartType=${chartType}&sortOrder=${sortOrder}${excludedValuesParam}&darkMode=${darkMode}${zoomParam}${aspectRatioParam}${legendParam}`;
+    
+    window.open(url, '_blank');
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -347,7 +366,7 @@ export default function ChartComponent({
   return (
     <div className={`relative ${darkMode ? 'text-white' : 'text-gray-800'}`}>
       <div className={`absolute top-0 right-0 z-10 flex items-center space-x-1 p-1 ${isFullscreen ? 'bg-black/20 rounded-bl-lg backdrop-blur-sm' : ''}`}>
-        <div className={`${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200`}>
+        <div className="transition-opacity duration-200">
           <select
             className={`text-xs p-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
             value={downloadFormat}
@@ -360,7 +379,7 @@ export default function ChartComponent({
         
         <button
           onClick={downloadChart}
-          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200 ${exporting ? 'cursor-not-allowed opacity-50' : ''}`}
+          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-opacity duration-200 ${exporting ? 'cursor-not-allowed opacity-50' : ''}`}
           title="Descargar gráfico"
           disabled={exporting}
         >
@@ -377,7 +396,7 @@ export default function ChartComponent({
         
         <button
           onClick={increaseZoom}
-          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200`}
+          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-opacity duration-200`}
           title="Aumentar zoom"
           disabled={zoom >= 200}
         >
@@ -388,7 +407,7 @@ export default function ChartComponent({
         
         <button
           onClick={decreaseZoom}
-          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200`}
+          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-opacity duration-200`}
           title="Disminuir zoom"
           disabled={zoom <= 40}
         >
@@ -399,7 +418,7 @@ export default function ChartComponent({
         
         <button
           onClick={resetZoom}
-          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200 ${zoom === 100 ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-opacity duration-200 ${zoom === 100 ? 'opacity-50 cursor-not-allowed' : ''}`}
           title="Restablecer zoom"
           disabled={zoom === 100}
         >
@@ -410,7 +429,7 @@ export default function ChartComponent({
         
         <button
           onClick={() => setShowLegend(!showLegend)}
-          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200`}
+          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-opacity duration-200`}
           title={showLegend ? "Ocultar leyenda" : "Mostrar leyenda"}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -420,13 +439,26 @@ export default function ChartComponent({
         
         <button
           onClick={toggleAspectRatio}
-          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200`}
+          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-opacity duration-200`}
           title="Cambiar relación de aspecto"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
           </svg>
         </button>
+        
+        {/* Add button to open in a new tab if not already in fullscreen page */}
+        {!isFullscreenPage && (
+          <button
+            onClick={openInNewTab}
+            className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-opacity duration-200`}
+            title="Abrir en nueva pestaña"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+        )}
         
         <button
           onClick={toggleFullscreen}
@@ -452,6 +484,7 @@ export default function ChartComponent({
             ? 'bg-black w-screen h-screen flex items-center justify-center' 
             : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-4`
         }`}
+        style={{ minHeight: isFullscreenPage ? '500px' : '300px' }}
       >
         {loading ? (
           <div className={`flex flex-col items-center justify-center ${isFullscreen ? 'h-screen' : 'h-80'}`}>
@@ -466,7 +499,7 @@ export default function ChartComponent({
             <p className="font-medium text-center">{error}</p>
           </div>
         ) : (
-          <div className={`${isFullscreen ? 'p-8 max-w-screen-xl mx-auto' : 'w-full'}`}>
+          <div className={`${isFullscreen || isFullscreenPage ? 'p-8 max-w-screen-xl mx-auto' : 'w-full'}`} style={{ minHeight: isFullscreenPage ? '400px' : undefined }}>
             {zoom !== 100 && (
               <div className={`absolute top-0 left-0 m-2 text-xs px-2 py-1 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
                 {zoom}%
