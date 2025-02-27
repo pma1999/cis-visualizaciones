@@ -80,8 +80,51 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
     
     setExporting(true);
     try {
+      // Preparar información del título y metadatos
+      const title = variableTitle || variable;
+      const subtitle = `Gráfico de ${getChartTypeName()}`;
+      const description = excludedValues.length > 0 
+        ? `${excludedValues.length} valores excluidos` 
+        : '';
+      
+      // Preparar información de la leyenda
+      const legendItems = chartType === 'pie' 
+        ? chartData.map(item => ({
+            color: item.color,
+            text: item.label
+          }))
+        : [{ color: '#007bff', text: 'Frecuencia' }];
+      
+      // Configurar el nombre del archivo
       const filename = `grafico_${variable}_${chartType}_${getFormattedDate()}`;
-      await exportAsImage(chartContainerRef.current, filename);
+
+      // Configurar opciones específicas según el tipo de gráfico
+      const chartOptions = {
+        chartType,
+        title,
+        subtitle,
+        description,
+        legendItems,
+        // Opciones específicas para cada tipo de gráfico
+        ...(chartType === 'pie' && { 
+          legendPosition: 'bottom',
+          legendAlign: 'center'
+        }),
+        ...(chartType === 'bar' && {
+          margins: windowWidth < 768 
+            ? { top: 10, right: 20, left: 0, bottom: 100 }
+            : { top: 10, right: 30, left: 10, bottom: 65 }
+        }),
+        ...(chartType === 'line' && {
+          lineStroke: '#007bff',
+          showPoints: true
+        })
+      };
+      
+      console.log('Opciones de exportación:', chartOptions);
+      
+      // Ejecutar el proceso de exportación usando la nueva API
+      await exportAsImage(chartContainerRef.current, filename, chartOptions);
     } catch (error) {
       console.error("Error al exportar el gráfico:", error);
     } finally {
@@ -173,15 +216,22 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
               >
                 <XAxis 
                   dataKey="label" 
-                  tick={{ fontSize: windowWidth < 768 ? 8 : 10, width: 50 }}
+                  tick={{ 
+                    fontSize: windowWidth < 768 ? 10 : 12,
+                    fontWeight: "500",
+                    width: 120
+                  }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
                   height={windowWidth < 768 ? 90 : 65}
                 />
-                <YAxis tick={{ fontSize: windowWidth < 768 ? 10 : 12 }} />
+                <YAxis tick={{ 
+                  fontSize: windowWidth < 768 ? 11 : 12,
+                  fontWeight: "500" 
+                }} />
                 <Tooltip />
-                <Bar dataKey="frequency" fill="#007bff" />
+                <Bar dataKey="frequency" fill="#007bff" isAnimationActive={false} />
               </BarChart>
             )}
             {chartType === "line" && (
@@ -195,15 +245,22 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
               >
                 <XAxis 
                   dataKey="label" 
-                  tick={{ fontSize: windowWidth < 768 ? 8 : 10, width: 50 }}
+                  tick={{ 
+                    fontSize: windowWidth < 768 ? 10 : 12,
+                    fontWeight: "500",
+                    width: 120 
+                  }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
                   height={windowWidth < 768 ? 90 : 65}
                 />
-                <YAxis tick={{ fontSize: windowWidth < 768 ? 10 : 12 }} />
+                <YAxis tick={{ 
+                  fontSize: windowWidth < 768 ? 11 : 12,
+                  fontWeight: "500"
+                }} />
                 <Tooltip />
-                <Line type="monotone" dataKey="frequency" stroke="#007bff" />
+                <Line type="monotone" dataKey="frequency" stroke="#007bff" isAnimationActive={false} />
               </LineChart>
             )}
             {chartType === "pie" && (
@@ -225,6 +282,7 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
                       : `${name}: ${(percent * 100).toFixed(0)}%`
                   }
                   labelLine={windowWidth < 768 ? false : true}
+                  isAnimationActive={false}
                 >
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />

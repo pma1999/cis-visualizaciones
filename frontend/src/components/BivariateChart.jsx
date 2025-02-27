@@ -154,12 +154,75 @@ export default function BivariateChart({
 
   // Función para exportar el gráfico como imagen
   const handleExportChart = async () => {
-    if (!chartContainerRef.current || !contingencyData) return;
+    if (!chartContainerRef.current) return;
     
     setExporting(true);
     try {
+      // Preparar información del título y metadatos
+      const title = "Análisis Bivariado";
+      const subtitle = `${variable1Title} vs ${variable2Title}`;
+      const description = `Gráfico de ${getChartTypeName()}${viewMode === 'relative' ? ` - Valores relativos (${getRelativeModeExplanation()})` : ''}`;
+      
+      const footnote = totalExcluded > 0 
+        ? `${totalExcluded} valores excluidos${excludedValues1.length > 0 ? ` (${excludedValues1.length} de ${variable1})` : ''}${excludedValues2.length > 0 ? ` (${excludedValues2.length} de ${variable2})` : ''}`
+        : '';
+
+      // Preparar información de leyenda para gráficos
+      const legendItems = [];
+      
+      if (chartType === "treemap") {
+        // Para treemap, extraer los colores de cada categoría principal
+        Object.entries(colorScheme).forEach(([key, scheme]) => {
+          if (contingencyData?.datos?.filas[key]) {
+            legendItems.push({
+              color: scheme.base,
+              text: contingencyData.datos.filas[key].etiqueta
+            });
+          }
+        });
+      } else if (chartType === "stacked") {
+        // Para gráficos de barras apiladas, extraer colores de cada serie
+        const colors = getChartColors(Object.keys(contingencyData.datos.columnas).filter(k => k !== "All").length);
+        
+        Object.entries(contingencyData.datos.columnas)
+          .filter(([key]) => key !== "All")
+          .forEach(([key, col], index) => {
+            legendItems.push({
+              color: colors[index],
+              text: col.etiqueta
+            });
+          });
+      }
+
+      // Configurar el nombre del archivo
       const filename = `grafico_bivariado_${variable1}_${variable2}_${chartType}_${getFormattedDate()}`;
-      await exportAsImage(chartContainerRef.current, filename);
+      
+      // Configurar opciones específicas según el tipo de gráfico
+      const chartOptions = {
+        chartType,
+        viewMode,
+        title,
+        subtitle,
+        description,
+        footnote,
+        legendItems,
+        // Agregar opciones específicas para cada tipo de gráfico
+        ...(chartType === "treemap" && {
+          legendPosition: 'bottom',
+          legendAlign: 'center'
+        }),
+        ...(chartType === "stacked" && {
+          legendPosition: windowWidth < 768 ? 'bottom' : 'right',
+          margins: windowWidth < 768 
+            ? { top: 20, right: 30, left: 0, bottom: 120 }
+            : { top: 20, right: 30, left: 20, bottom: 70 }
+        })
+      };
+      
+      console.log('Opciones de exportación:', chartOptions);
+      
+      // Ejecutar el proceso de exportación usando la nueva API
+      await exportAsImage(chartContainerRef.current, filename, chartOptions);
     } catch (error) {
       console.error("Error al exportar el gráfico:", error);
     } finally {
@@ -528,7 +591,11 @@ export default function BivariateChart({
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="name"
-                  tick={{ fontSize: windowWidth < 768 ? 8 : 10 }}
+                  tick={{ 
+                    fontSize: windowWidth < 768 ? 10 : 12,
+                    fontWeight: "500",
+                    width: 120
+                  }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
@@ -543,16 +610,22 @@ export default function BivariateChart({
                           : { value: 'Frecuencia', angle: -90, position: 'insideLeft', dy: -10 }
                         )
                   }
-                  tick={{ fontSize: windowWidth < 768 ? 9 : 10 }}
+                  tick={{ 
+                    fontSize: windowWidth < 768 ? 11 : 12,
+                    fontWeight: "500"
+                  }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{ 
                     paddingTop: 10, 
                     fontSize: windowWidth < 768 ? 10 : 12,
+                    fontWeight: "500",
                     width: '100%',
                     marginLeft: windowWidth < 768 ? -20 : 0 
                   }} 
+                  iconSize={windowWidth < 768 ? 8 : 10}
+                  iconType="square"
                 />
                 {Object.entries(contingencyData.datos.columnas)
                   .filter(([key]) => key !== "All")
@@ -562,6 +635,7 @@ export default function BivariateChart({
                       dataKey={col.etiqueta}
                       stackId="a"
                       fill={getChartColors(array.length)[index]}
+                      isAnimationActive={false} // Disable animations for better export
                     />
                   ))}
               </BarChart>
