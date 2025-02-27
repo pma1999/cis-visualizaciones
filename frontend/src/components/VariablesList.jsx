@@ -436,17 +436,19 @@ const VariablesList = memo(({ onSelect, excludeVariable, isCompact = false, dark
             <ul className="space-y-2">
               {filteredVariables.map(([varCode, varLabel]) => (
                 <li key={varCode} className="relative group">
-                  <button
-                    onClick={() => handleVariableSelect(varCode, varLabel)}
-                    className={`w-full text-left ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-500 hover:bg-blue-600'} 
-                      text-white py-2 px-4 rounded-md transition flex items-center pr-10`}
-                  >
-                    <div className="flex-1 overflow-hidden">
-                      <span className="font-medium block truncate">{varLabel}</span>
-                      <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-blue-100'} block truncate`}>
-                        ({varCode})
-                      </span>
-                    </div>
+                  <div className="relative">
+                    <button
+                      onClick={() => handleVariableSelect(varCode, varLabel)}
+                      className={`w-full text-left ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-500 hover:bg-blue-600'} 
+                        text-white py-2 px-4 rounded-md transition flex items-center ${!isCompact ? 'pr-10' : ''}`}
+                    >
+                      <div className="flex-1 overflow-hidden">
+                        <span className="font-medium block truncate">{varLabel}</span>
+                        <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-blue-100'} block truncate`}>
+                          ({varCode})
+                        </span>
+                      </div>
+                    </button>
                     
                     {!isCompact && (
                       <button
@@ -466,7 +468,7 @@ const VariablesList = memo(({ onSelect, excludeVariable, isCompact = false, dark
                         </svg>
                       </button>
                     )}
-                  </button>
+                  </div>
                 </li>
               ))}
             </ul>
