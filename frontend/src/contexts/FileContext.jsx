@@ -1,5 +1,12 @@
 import { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
-import { getAvailableFiles, activateFile, clearApiCache, getFilesMetadata } from '../api/cisApi';
+import { 
+  getAvailableFiles, 
+  activateFile as apiActivateFile, 
+  clearApiCache, 
+  getFilesMetadata, 
+  updateFileFriendlyName, 
+  updateFileDescription 
+} from '../api/cisApi';
 
 // Crear el contexto
 export const FileContext = createContext();
@@ -188,7 +195,7 @@ export const FileProvider = ({ children }) => {
   }, [activeFile, lastSyncTime, lastModifiedHash, calculateFilesHash]);
   
   // Función para activar un archivo
-  const handleActivateFile = async (filename) => {
+  const handleActivateFile = async (filename, isLocal = false) => {
     if (filename === activeFile) {
       return { success: true, message: 'Este archivo ya está activo' };
     }
@@ -200,13 +207,24 @@ export const FileProvider = ({ children }) => {
       clearApiCache('available_files');
       clearApiCache('variables');
       
-      // Primera activación
-      const activationResult = await activateFile(filename);
+      // Activar el archivo (local o remoto)
+      const activationResult = await apiActivateFile(filename, isLocal);
       
       // Actualizar inmediatamente el estado local para mejor UX
       setActiveFile(filename);
       
-      // Sistema de reintentos para asegurar sincronización con el backend
+      // Si es un archivo local, no necesitamos verificar con el backend
+      if (isLocal) {
+        setLastSyncTime(Date.now());
+        setIsLoading(false);
+        return { 
+          success: true, 
+          activeFile: filename,
+          message: 'Archivo local activado correctamente'
+        };
+      }
+      
+      // Para archivos remotos, sistema de reintentos para asegurar sincronización con el backend
       let retryCount = 0;
       let maxRetries = 3;
       let backendVerified = false;
@@ -227,7 +245,7 @@ export const FileProvider = ({ children }) => {
         } else {
           // Reintento de activación silencioso
           clearApiCache('available_files'); 
-          await activateFile(filename);
+          await apiActivateFile(filename);
           retryCount++;
         }
         
@@ -249,23 +267,21 @@ export const FileProvider = ({ children }) => {
       setLastSyncTime(Date.now());
       setIsLoading(false);
       
-      // Limpiar caché para forzar recarga de datos relacionados
-      clearApiCache('variables');
-      clearApiCache('datos');
-      clearApiCache('distribucion');
-      
-      return { 
-        success: true, 
-        message: finalActiveFile === filename 
-          ? 'Archivo activado correctamente' 
-          : 'El sistema seleccionó un archivo diferente al solicitado',
-        activeFile: finalActiveFile
+      return {
+        success: true,
+        activeFile: finalActiveFile,
+        message: backendVerified ? 'Archivo activado correctamente' : 'Archivo activado con advertencias'
       };
-    } catch (err) {
-      setError(`Error al activar el archivo: ${err.message}`);
+    } catch (error) {
       setIsLoading(false);
-      console.error('Error activating file:', err);
-      return { success: false, message: err.message };
+      console.error('Error activating file:', error);
+      
+      // Si hay un error, mantener el archivo activo anterior
+      return {
+        success: false,
+        error: error.message,
+        message: 'Error al activar el archivo'
+      };
     }
   };
   
@@ -341,29 +357,61 @@ export const FileProvider = ({ children }) => {
     };
   }, [loadFiles, setupPolling]);
   
-  // Función para actualizar el nombre amigable personalizado
-  const updateUserFriendlyName = useCallback((filename, friendlyName) => {
-    // Actualizar el estado
-    setUserFriendlyNames(prev => ({
-      ...prev,
-      [filename]: friendlyName
-    }));
-    
-    // Guardar en localStorage
-    return setStoredFriendlyName(filename, friendlyName);
-  }, []);
+  // Función para actualizar nombre amigable personalizado
+  const updateUserFriendlyName = async (filename, friendlyName, isLocal = false) => {
+    try {
+      // Actualizarlo localmente para respuesta inmediata
+      setUserFriendlyNames(prev => ({
+        ...prev,
+        [filename]: friendlyName
+      }));
+      
+      // Guardar en localStorage
+      setStoredFriendlyName(filename, friendlyName);
+      
+      // Actualizar en el servidor si no es un archivo local
+      if (isLocal) {
+        // Para archivos locales, actualizar solo los metadatos en IndexedDB
+        await updateFileFriendlyName(filename, friendlyName, true);
+      } else {
+        // Para archivos remotos, actualizar en el servidor
+        await updateFileFriendlyName(filename, friendlyName, false);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating friendly name:', error);
+      return { success: false, error: error.message };
+    }
+  };
   
-  // Función para actualizar la descripción personalizada
-  const updateUserDescription = useCallback((filename, description) => {
-    // Actualizar el estado
-    setUserDescriptions(prev => ({
-      ...prev,
-      [filename]: description
-    }));
-    
-    // Guardar en localStorage
-    return setStoredDescription(filename, description);
-  }, []);
+  // Función para actualizar descripción personalizada
+  const updateUserDescription = async (filename, description, isLocal = false) => {
+    try {
+      // Actualizarlo localmente para respuesta inmediata
+      setUserDescriptions(prev => ({
+        ...prev,
+        [filename]: description
+      }));
+      
+      // Guardar en localStorage
+      setStoredDescription(filename, description);
+      
+      // Actualizar en el servidor si no es un archivo local
+      if (isLocal) {
+        // Para archivos locales, actualizar solo los metadatos en IndexedDB
+        await updateFileDescription(filename, description, true);
+      } else {
+        // Para archivos remotos, actualizar en el servidor
+        await updateFileDescription(filename, description, false);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating description:', error);
+      return { success: false, error: error.message };
+    }
+  };
   
   // Cargar metadatos del servidor (nombres amigables y descripciones por defecto)
   const loadMetadata = useCallback(async () => {

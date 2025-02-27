@@ -48,7 +48,7 @@ export default function AnalysisPage() {
   }, [isSidebarOpen]);
 
   // Manejar el cambio de archivo activo
-  const handleFileChange = (filename) => {
+  const handleFileChange = (filename, isLocalFile = false) => {
     // Limpiar los datos cargados
     setSelectedVariable(null);
     setSecondaryVariable(null);
@@ -62,7 +62,7 @@ export default function AnalysisPage() {
     setExcludedSecondaryValues([]);
     
     // No es necesario actualizar nada más ya que VariablesList se encarga de cargar las variables
-    console.log(`Archivo activo cambiado a: ${filename}`);
+    console.log(`Archivo activo cambiado a: ${filename}${isLocalFile ? ' (local)' : ''}`);
   };
 
   return (
