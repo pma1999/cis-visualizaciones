@@ -8,7 +8,7 @@ import {
   saveLocalFile, 
   getLocalFile, 
   listLocalFiles, 
-  deleteLocalFile,
+  deleteLocalFile as deleteLocalFileFromStorage,
   updateLocalFileMetadata
 } from '../utils/localFileStorage';
 
@@ -539,7 +539,7 @@ export async function deleteFile(filename, isLocal = false) {
   try {
     if (isLocal) {
       // Eliminar archivo local
-      const result = await deleteLocalFile(filename);
+      const result = await deleteLocalFileFromStorage(filename);
       
       // Si el archivo eliminado era el activo, limpiar el estado
       if (localStorage.getItem('cis_active_file') === filename) {
@@ -676,6 +676,36 @@ export function clearApiCache(pattern) {
     apiCache.clearPattern(pattern);
   } else {
     apiCache.clear();
+  }
+}
+
+/**
+ * Elimina un archivo local
+ * @param {string} filename - Nombre del archivo a eliminar
+ * @returns {Promise<Object>} - Resultado de la operación
+ * @throws {Error} Si ocurre un error durante la eliminación
+ */
+export async function deleteLocalFile(filename) {
+  try {
+    // Verificar si el archivo es el archivo activo
+    const activeFile = localStorage.getItem('cis_active_file');
+    if (activeFile === filename) {
+      throw new Error('No puedes eliminar el archivo actualmente activo. Por favor, activa otro archivo primero.');
+    }
+    
+    // Eliminar archivo del almacenamiento local
+    await deleteLocalFileFromStorage(filename);
+    
+    // Limpiar caché relacionada
+    clearApiCache('files');
+    
+    return {
+      success: true,
+      message: 'Archivo eliminado correctamente'
+    };
+  } catch (error) {
+    console.error('Error eliminando archivo local:', error);
+    throw error;
   }
 }
 
