@@ -16,7 +16,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.2.0",
-    "recharts": "^2.15.1"
+    "recharts": "^2.15.1",
+    "save-svg-as-png": "^1.4.17"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
