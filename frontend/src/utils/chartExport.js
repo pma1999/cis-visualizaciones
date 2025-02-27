@@ -318,30 +318,123 @@ const exportUsingCanvas = async (container, filename, options = {}) => {
   try {
     console.log('Exportando usando canvas con contenedor de tamaño:', container.offsetWidth, 'x', container.scrollHeight);
     
-    // Configuración para html2canvas
+    // Si se activa la opción skipCssColors, intentamos reemplazar los colores OKLCH con alternativas compatibles
+    if (options.skipCssColors) {
+      // Guardar una referencia a los estilos originales
+      const elementsToRestore = [];
+      
+      try {
+        // Buscar elementos con posibles colores problemáticos
+        const allElements = container.querySelectorAll('*');
+        allElements.forEach(el => {
+          const style = window.getComputedStyle(el);
+          const originalStyles = {};
+          let needsRestore = false;
+          
+          // Lista de formatos de color problemáticos
+          const problematicColorFormats = ['oklch', 'oklab', 'lch', 'lab', 'hsl('];
+          
+          // Verificar propiedades de color comunes que podrían usar formatos de color problemáticos
+          const colorProps = ['backgroundColor', 'color', 'borderColor', 'fill', 'stroke'];
+          colorProps.forEach(prop => {
+            const cssName = prop.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`); // camelCase a kebab-case
+            const value = style[prop];
+            
+            if (value && typeof value === 'string') {
+              const hasProblematicFormat = problematicColorFormats.some(format => 
+                value.toLowerCase().includes(format)
+              );
+              
+              if (hasProblematicFormat) {
+                // Determinar si es un modo oscuro basado en análisis de colores
+                // Un análisis simple es mirar si el color de fondo es oscuro
+                const isDarkMode = options.darkMode || (
+                  style.backgroundColor && 
+                  style.backgroundColor.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/) && 
+                  (parseInt(RegExp.$1) + parseInt(RegExp.$2) + parseInt(RegExp.$3)) / 3 < 128
+                );
+                
+                // Guardar el estilo original para restaurarlo después
+                originalStyles[cssName] = el.style[prop];
+                needsRestore = true;
+                
+                // Aplicar colores de reemplazo según el tipo de propiedad y el modo
+                if (prop === 'color') {
+                  // Para texto
+                  el.style[prop] = isDarkMode ? '#e2e8f0' : '#1e293b';
+                } else if (prop === 'backgroundColor') {
+                  // Para fondos
+                  el.style[prop] = isDarkMode ? '#1e293b' : '#f8fafc';
+                } else if (prop === 'fill') {
+                  // Para rellenos SVG
+                  el.style[prop] = isDarkMode ? '#4b5563' : '#334155';
+                } else if (prop === 'stroke') {
+                  // Para bordes SVG
+                  el.style[prop] = isDarkMode ? '#6b7280' : '#64748b';
+                } else {
+                  // Para otros tipos de propiedades
+                  el.style[prop] = isDarkMode ? '#4b5563' : '#cbd5e1';
+                }
+              }
+            }
+          });
+          
+          if (needsRestore) {
+            elementsToRestore.push({ element: el, originalStyles });
+          }
+        });
+      } catch (error) {
+        console.warn('Error al procesar colores CSS:', error);
+      }
+      
+      // Guardar una referencia a la función de restauración para usarla después
+      const restoreOriginalStyles = () => {
+        elementsToRestore.forEach(({ element, originalStyles }) => {
+          Object.entries(originalStyles).forEach(([prop, value]) => {
+            element.style[prop] = value;
+          });
+        });
+      };
+      
+      // Configurar para restaurar los estilos después de la captura
+      setTimeout(() => {
+        restoreOriginalStyles();
+      }, 5000); // Darle tiempo suficiente a html2canvas para capturar
+    }
+    
+    // Opciones para html2canvas
     const canvasOptions = {
-      scale: 3, // Aumentado de 2 a 3 para mejor calidad
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: true, // Habilitar logs para depuración
-      width: container.offsetWidth,
-      height: container.scrollHeight,
-      ...options
+      scale: options.scale || 2, // Mayor escala para mejor calidad
+      useCORS: true, // Permitir imágenes de otros dominios
+      allowTaint: true, // Permitir que se contamine el canvas con imágenes externas
+      backgroundColor: options.darkMode ? '#0f172a' : '#ffffff', // Color de fondo según modo
+      windowWidth: container.scrollWidth,
+      windowHeight: container.scrollHeight,
+      logging: false, // Desactivar logs para mejorar rendimiento
+      ...options.canvasOptions // Permitir opciones personalizadas adicionales
     };
     
-    // Capturar el contenedor como canvas
+    // Capturar el elemento como canvas
     const canvas = await html2canvas(container, canvasOptions);
     
-    // Verificar que el canvas tiene contenido
-    console.log('Canvas generado:', canvas.width, 'x', canvas.height);
-    
-    // Convertir a imagen y descargar
-    const image = canvas.toDataURL('image/png', 1.0);
-    const link = document.createElement('a');
-    link.download = `${filename}.png`;
-    link.href = image;
-    link.click();
+    // Convertir canvas a URL de datos (blob para formato ajustable)
+    canvas.toBlob((blob) => {
+      // Crear URL para el blob
+      const url = URL.createObjectURL(blob);
+      
+      // Crear enlace para descarga
+      const downloadLink = document.createElement('a');
+      downloadLink.href = url;
+      downloadLink.download = `${filename}.png`;
+      
+      // Simular clic para descargar
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      // Liberar URL
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    }, 'image/png');
     
     return true;
   } catch (error) {
@@ -383,9 +476,9 @@ const exportUsingSvg = async (container, filename, options = {}) => {
 };
 
 /**
- * Enfoque alternativo: Crear un elemento visual completo con HTML
- * @param {HTMLElement} originalElement - Elemento original que contiene el gráfico
- * @param {Object} options - Opciones de configuración para la exportación
+ * Crea un elemento HTML completo para exportar, incluyendo título, subtítulo y leyenda
+ * @param {HTMLElement} originalElement - Elemento del gráfico original
+ * @param {Object} options - Opciones de configuración
  * @returns {HTMLElement} Elemento completo listo para exportar
  */
 const createCompleteChartElement = (originalElement, options) => {
@@ -395,24 +488,27 @@ const createCompleteChartElement = (originalElement, options) => {
   // Crear un nuevo contenedor para el gráfico completo
   const completeContainer = document.createElement('div');
   completeContainer.style.fontFamily = 'Arial, sans-serif';
-  completeContainer.style.backgroundColor = '#ffffff';
-  completeContainer.style.border = '1px solid #eaeaea';
+  completeContainer.style.backgroundColor = options.darkMode ? '#0f172a' : '#ffffff';
+  completeContainer.style.border = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
   completeContainer.style.borderRadius = '8px';
   completeContainer.style.overflow = 'hidden';
-  completeContainer.style.width = `${options.width}px`;
-  completeContainer.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
+  completeContainer.style.width = `${options.width || 800}px`;
+  completeContainer.style.boxShadow = options.darkMode ? 
+    '0 4px 12px rgba(0,0,0,0.25)' : 
+    '0 2px 10px rgba(0,0,0,0.05)';
+  completeContainer.style.color = options.darkMode ? '#e2e8f0' : '#1e293b';
   
   // 1. Agregar sección de título
   const titleSection = document.createElement('div');
   titleSection.style.padding = '15px 10px';
-  titleSection.style.borderBottom = '1px solid #eaeaea';
+  titleSection.style.borderBottom = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
   titleSection.style.textAlign = 'center';
   
   const title = document.createElement('h2');
   title.style.margin = '0 0 5px 0';
   title.style.fontSize = '22px';
   title.style.fontWeight = 'bold';
-  title.style.color = '#333';
+  title.style.color = options.darkMode ? '#f1f5f9' : '#333';
   title.textContent = options.title || chartInfo.title || '';
   
   titleSection.appendChild(title);
@@ -421,7 +517,7 @@ const createCompleteChartElement = (originalElement, options) => {
     const subtitle = document.createElement('p');
     subtitle.style.margin = '0 0 3px 0';
     subtitle.style.fontSize = '16px';
-    subtitle.style.color = '#555';
+    subtitle.style.color = options.darkMode ? '#cbd5e1' : '#555';
     subtitle.textContent = options.subtitle || chartInfo.subtitle || '';
     titleSection.appendChild(subtitle);
   }
@@ -430,70 +526,59 @@ const createCompleteChartElement = (originalElement, options) => {
     const description = document.createElement('p');
     description.style.margin = '3px 0 0 0';
     description.style.fontSize = '14px';
-    description.style.color = '#777';
+    description.style.color = options.darkMode ? '#94a3b8' : '#777';
     description.textContent = options.description || chartInfo.description || '';
     titleSection.appendChild(description);
   }
   
   completeContainer.appendChild(titleSection);
   
-  // 2. Agregar el gráfico (clonar el SVG o contenido equivalente)
-  const chartSection = document.createElement('div');
-  chartSection.style.padding = '0';
+  // 2. Clonar y ajustar el contenido del gráfico original
+  const chartContent = document.createElement('div');
+  chartContent.style.padding = '15px';
+  chartContent.style.textAlign = 'center';
+  chartContent.style.backgroundColor = options.darkMode ? '#1e293b' : '#ffffff';
   
-  // Aumentar la altura del gráfico
-  const isMobile = window.innerWidth < 768;
-  const chartHeight = options.chartHeight || (isMobile ? 500 : 600);
-  chartSection.style.height = `${chartHeight}px`;
+  // Clonar el elemento original
+  const chartClone = originalElement.cloneNode(true);
   
-  const svgElement = originalElement.querySelector('svg');
-  if (svgElement) {
-    const clonedSvg = svgElement.cloneNode(true);
-    optimizeSvgForExport(clonedSvg, options.width, chartHeight);
-    chartSection.appendChild(clonedSvg);
-  } else {
-    // Si no hay SVG, intentar extraer el contenedor del gráfico
-    const chartContent = originalElement.querySelector('.recharts-wrapper') || 
-                        originalElement.querySelector('.h-\\[calc\\(100\\%-60px\\)\\]') ||
-                        originalElement.querySelector('.h-\\[calc\\(100\\%-80px\\)\\]');
-    
-    if (chartContent) {
-      chartSection.innerHTML = chartContent.innerHTML;
-    } else {
-      // Último recurso: usar el HTML completo
-      chartSection.innerHTML = originalElement.innerHTML;
-    }
-  }
+  // Asegurarse que el gráfico clonado tenga las dimensiones correctas
+  chartClone.style.width = '100%';
+  chartClone.style.maxWidth = '100%';
+  chartClone.style.height = 'auto';
+  chartClone.style.minHeight = '300px';
+  chartClone.style.margin = '0 auto';
   
-  completeContainer.appendChild(chartSection);
+  chartContent.appendChild(chartClone);
+  completeContainer.appendChild(chartContent);
   
-  // 3. Agregar leyenda si existen elementos
-  const legendItems = options.legendItems || chartInfo.legendItems;
-  if (legendItems && legendItems.length > 0) {
+  // 3. Agregar leyenda si está disponible
+  if (chartInfo.legendItems && chartInfo.legendItems.length > 0) {
     const legendSection = document.createElement('div');
-    legendSection.style.padding = '10px';
-    legendSection.style.borderTop = '1px solid #eaeaea';
+    legendSection.style.padding = '10px 15px 15px';
+    legendSection.style.borderTop = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
     legendSection.style.display = 'flex';
     legendSection.style.flexWrap = 'wrap';
     legendSection.style.justifyContent = 'center';
     legendSection.style.gap = '10px';
     
-    legendItems.forEach(item => {
+    chartInfo.legendItems.forEach(item => {
       const legendItem = document.createElement('div');
       legendItem.style.display = 'flex';
       legendItem.style.alignItems = 'center';
-      legendItem.style.marginRight = '12px';
+      legendItem.style.marginRight = '15px';
       
-      const colorBox = document.createElement('div');
-      colorBox.style.width = '15px';
-      colorBox.style.height = '15px';
+      const colorBox = document.createElement('span');
+      colorBox.style.display = 'inline-block';
+      colorBox.style.width = '12px';
+      colorBox.style.height = '12px';
       colorBox.style.backgroundColor = item.color;
-      colorBox.style.marginRight = '6px';
-      colorBox.style.borderRadius = '3px';
+      colorBox.style.marginRight = '5px';
+      colorBox.style.borderRadius = '2px';
       
       const label = document.createElement('span');
-      label.style.fontSize = '14px';
-      label.style.color = '#333';
+      label.style.fontSize = '13px';
+      label.style.color = options.darkMode ? '#cbd5e1' : '#666';
       label.textContent = item.text;
       
       legendItem.appendChild(colorBox);
@@ -504,14 +589,14 @@ const createCompleteChartElement = (originalElement, options) => {
     completeContainer.appendChild(legendSection);
   }
   
-  // 4. Agregar nota al pie si existe
+  // 4. Agregar pie de página si está disponible
   if (options.footnote) {
     const footnoteSection = document.createElement('div');
-    footnoteSection.style.padding = '8px 10px';
-    footnoteSection.style.borderTop = '1px solid #eaeaea';
+    footnoteSection.style.padding = '8px 15px';
+    footnoteSection.style.borderTop = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
     footnoteSection.style.fontSize = '12px';
-    footnoteSection.style.color = '#666';
-    footnoteSection.style.textAlign = 'center';
+    footnoteSection.style.color = options.darkMode ? '#94a3b8' : '#777';
+    footnoteSection.style.textAlign = 'left';
     footnoteSection.textContent = options.footnote;
     
     completeContainer.appendChild(footnoteSection);
@@ -541,7 +626,9 @@ export const exportAsImage = async (originalChartElement, filename, userOptions 
     const options = { 
       ...deviceSettings,
       ...userOptions,
-      chartType: userOptions.chartType || 'default'
+      chartType: userOptions.chartType || 'default',
+      skipCssColors: userOptions.skipCssColors || false, // Opción para manejar colores problemáticos como OKLCH
+      darkMode: userOptions.darkMode || false // Asegurar que darkMode siempre esté definido
     };
     
     // 3. Extraer información del gráfico original
@@ -555,53 +642,34 @@ export const exportAsImage = async (originalChartElement, filename, userOptions 
       title: options.title,
       subtitle: options.subtitle,
       description: options.description,
-      legendItems: options.legendItems.map(item => `${item.text}: ${item.color}`).join(', '),
+      legendItems: options.legendItems.map(item => item.text ? `${item.text}: ${item.color}` : 'sin texto').join(', '),
       footnote: options.footnote || ''
     });
     
-    // NUEVO ENFOQUE: Crear un elemento visual completo con HTML
+    // 4. Crear un elemento visual completo con HTML
     const completeChartElement = createCompleteChartElement(originalChartElement, options);
     
-    // Agregar temporalmente al body para poder capturarlo
+    // 5. Agregar temporalmente al body para poder capturarlo
     completeChartElement.style.position = 'fixed';
     completeChartElement.style.top = '0';
     completeChartElement.style.left = '-9999px';
-    completeChartElement.style.zIndex = '-1';
+    completeChartElement.style.zIndex = '-9999';
     document.body.appendChild(completeChartElement);
     
-    // Asegurarnos que todo está renderizado correctamente
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // 6. Dar tiempo al navegador para renderizar correctamente
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    console.log('Dimensiones del elemento completo:', completeChartElement.offsetWidth, 'x', completeChartElement.scrollHeight);
-    
-    // Exportar usando canvas
-    const exportSuccess = await exportUsingCanvas(completeChartElement, filename, {
-      width: completeChartElement.offsetWidth,
-      height: completeChartElement.scrollHeight,
-      scale: 3, // Aumentado de 2 a 3 para mejor calidad
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: true // Para depuración
-    });
-    
-    // Limpiar: eliminar el elemento temporal
-    document.body.removeChild(completeChartElement);
-    
-    return exportSuccess;
+    try {
+      // 7. Exportar usando Canvas
+      const success = await exportUsingCanvas(completeChartElement, filename, options);
+      
+      return success;
+    } finally {
+      // 8. Limpiar: eliminar el elemento temporal
+      document.body.removeChild(completeChartElement);
+    }
   } catch (error) {
-    console.error('Error al exportar el gráfico:', error);
-    
-    // Intentar eliminar cualquier elemento temporal
-    const tempElements = document.querySelectorAll('[style*="position: fixed"][style*="left: -9999px"]');
-    tempElements.forEach(el => {
-      try {
-        document.body.removeChild(el);
-      } catch (e) {
-        // Ignorar errores de limpieza
-      }
-    });
-    
+    console.error('Error al exportar como imagen:', error);
     return false;
   }
 }; 

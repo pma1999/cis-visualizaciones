@@ -14,20 +14,24 @@ import {
 import { exportAsImage, getFormattedDate } from "../utils/chartExport";
 
 // Función para generar colores base distintivos
-const generateBaseColors = (count) => {
+const generateBaseColors = (count, darkMode = false) => {
+  const saturation = darkMode ? 80 : 70;
+  const lightness = darkMode ? 55 : 45;
+  
   return Array.from({ length: count }, (_, i) => {
     const hue = (i * 360) / count;
-    return `hsl(${hue}, 70%, 45%)`; // Color base distintivo
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`; // Color base distintivo
   });
 };
 
 // Función para generar variaciones de un color base
-const generateColorVariations = (baseColor, count) => {
+const generateColorVariations = (baseColor, count, darkMode = false) => {
   const hsl = baseColor.match(/\d+/g).map(Number);
   return Array.from({ length: count }, (_, i) => {
     // Ajustar la luminosidad para subcategorías, manteniendo el mismo tono
-    const lightness = 45 + (i * 15);
-    return `hsl(${hsl[0]}, ${hsl[1]}%, ${Math.min(lightness, 75)}%)`;
+    const lightnessDelta = darkMode ? 5 : 15;
+    const lightness = (darkMode ? 55 : 45) + (i * lightnessDelta);
+    return `hsl(${hsl[0]}, ${hsl[1]}%, ${Math.min(lightness, darkMode ? 80 : 75)}%)`;
   });
 };
 
@@ -36,7 +40,8 @@ export default function BivariateChart({
   variable2, 
   chartType = "treemap", 
   excludedValues1 = [], 
-  excludedValues2 = [] 
+  excludedValues2 = [],
+  darkMode = false
 }) {
   const [originalData, setOriginalData] = useState(null);
   const [contingencyData, setContingencyData] = useState(null);
@@ -137,7 +142,7 @@ export default function BivariateChart({
       .filter(([key]) => key !== "All")
       .map(([key]) => key);
     
-    const baseColors = generateBaseColors(mainCategories.length);
+    const baseColors = generateBaseColors(mainCategories.length, darkMode);
     const scheme = {};
     
     mainCategories.forEach((category, index) => {
@@ -145,12 +150,12 @@ export default function BivariateChart({
         .filter(key => key !== "All");
       scheme[category] = {
         base: baseColors[index],
-        variations: generateColorVariations(baseColors[index], secondaryCategories.length)
+        variations: generateColorVariations(baseColors[index], secondaryCategories.length, darkMode)
       };
     });
     
     setColorScheme(scheme);
-  }, [originalData, excludedValues1, excludedValues2]);
+  }, [originalData, excludedValues1, excludedValues2, darkMode]);
 
   // Función para exportar el gráfico como imagen
   const handleExportChart = async () => {
@@ -158,73 +163,46 @@ export default function BivariateChart({
     
     setExporting(true);
     try {
-      // Preparar información del título y metadatos
-      const title = "Análisis Bivariado";
-      const subtitle = `${variable1Title} vs ${variable2Title}`;
-      const description = `Gráfico de ${getChartTypeName()}${viewMode === 'relative' ? ` - Valores relativos (${getRelativeModeExplanation()})` : ''}`;
-      
-      const footnote = totalExcluded > 0 
-        ? `${totalExcluded} valores excluidos${excludedValues1.length > 0 ? ` (${excludedValues1.length} de ${variable1})` : ''}${excludedValues2.length > 0 ? ` (${excludedValues2.length} de ${variable2})` : ''}`
-        : '';
-
-      // Preparar información de leyenda para gráficos
-      const legendItems = [];
-      
-      if (chartType === "treemap") {
-        // Para treemap, extraer los colores de cada categoría principal
-        Object.entries(colorScheme).forEach(([key, scheme]) => {
-          if (contingencyData?.datos?.filas[key]) {
-            legendItems.push({
-              color: scheme.base,
-              text: contingencyData.datos.filas[key].etiqueta
-            });
-          }
-        });
-      } else if (chartType === "stacked") {
-        // Para gráficos de barras apiladas, extraer colores de cada serie
-        const colors = getChartColors(Object.keys(contingencyData.datos.columnas).filter(k => k !== "All").length);
-        
-        Object.entries(contingencyData.datos.columnas)
-          .filter(([key]) => key !== "All")
-          .forEach(([key, col], index) => {
-            legendItems.push({
-              color: colors[index],
-              text: col.etiqueta
-            });
-          });
-      }
-
-      // Configurar el nombre del archivo
-      const filename = `grafico_bivariado_${variable1}_${variable2}_${chartType}_${getFormattedDate()}`;
-      
-      // Configurar opciones específicas según el tipo de gráfico
-      const chartOptions = {
-        chartType,
-        viewMode,
-        title,
-        subtitle,
-        description,
-        footnote,
-        legendItems,
-        // Agregar opciones específicas para cada tipo de gráfico
-        ...(chartType === "treemap" && {
-          legendPosition: 'bottom',
-          legendAlign: 'center'
-        }),
-        ...(chartType === "stacked" && {
-          legendPosition: windowWidth < 768 ? 'bottom' : 'right',
-          margins: windowWidth < 768 
-            ? { top: 20, right: 30, left: 0, bottom: 120 }
-            : { top: 20, right: 30, left: 20, bottom: 70 }
-        })
+      // Preparar opciones para la exportación
+      const options = {
+        title: `Análisis bivariado de ${variable1Title} y ${variable2Title}`,
+        subtitle: `Tipo de gráfico: ${chartType === 'treemap' ? 'Mapa de árbol' : 'Barras apiladas'}`,
+        description: `Modo de visualización: ${viewMode === 'absolute' ? 'Valores absolutos' : 'Porcentajes'}`,
+        darkMode: darkMode,
+        chartType: chartType,
+        width: chartContainerRef.current.offsetWidth * 1.5,
+        height: chartContainerRef.current.offsetHeight * 1.5,
+        footnote: excludedValues1.length || excludedValues2.length ? 
+          `Valores excluidos: ${excludedValues1.length} en variable 1, ${excludedValues2.length} en variable 2` : 
+          undefined,
+        // Mejoras para garantizar una exportación perfecta
+        scale: 2, // Aumentar escala para mejor calidad
+        canvasOptions: {
+          logging: false, // Reducir ruido en consola
+          allowTaint: true, // Permitir contenido externo
+          useCORS: true, // Importante para imágenes externas
+          backgroundColor: darkMode ? '#0f172a' : '#ffffff',
+          windowWidth: window.innerWidth, // Asegurar que se capture todo el ancho
+          windowHeight: window.innerHeight // Asegurar altura correcta
+        },
+        skipCssColors: true // Manejar colores modernos como OKLCH que causan problemas
       };
       
-      console.log('Opciones de exportación:', chartOptions);
+      // Nombre del archivo
+      const filename = `grafico_bivariado_${variable1}_${variable2}_${chartType}_${getFormattedDate()}`;
       
-      // Ejecutar el proceso de exportación usando la nueva API
-      await exportAsImage(chartContainerRef.current, filename, chartOptions);
+      // Esperar a que el componente esté completamente renderizado
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Usar la función avanzada de exportación
+      const success = await exportAsImage(chartContainerRef.current, filename, options);
+      
+      if (!success) {
+        throw new Error("No se pudo exportar el gráfico");
+      }
     } catch (error) {
       console.error("Error al exportar el gráfico:", error);
+      alert('Error al exportar el gráfico. Por favor, inténtelo de nuevo.');
     } finally {
       setExporting(false);
     }
@@ -250,12 +228,12 @@ export default function BivariateChart({
 
   if (loading) {
     return (
-      <div className="p-4 border rounded-md bg-white shadow">
+      <div className={`p-4 border rounded-lg shadow ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-800 border-gray-200'} transition-colors duration-200`}>
         <h3 className="text-lg font-semibold mb-4">
           Cargando datos...
         </h3>
         <div className="animate-pulse space-y-4">
-          <div className="h-64 bg-gray-300 rounded"></div>
+          <div className={`h-64 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
         </div>
       </div>
     );
@@ -346,13 +324,13 @@ export default function BivariateChart({
     if (chartType === "treemap") {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-3 border rounded shadow">
+        <div className={`p-3 border rounded shadow ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>
           <div className="border-b pb-2 mb-2">
-            <p className="font-medium text-gray-600">{data.mainVariable}</p>
+            <p className={`font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{data.mainVariable}</p>
             <p className="font-bold">{data.mainValue || data.mainLabel}</p>
           </div>
           <div className="border-b pb-2 mb-2">
-            <p className="font-medium text-gray-600">{data.secondaryVariable}</p>
+            <p className={`font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{data.secondaryVariable}</p>
             <p className="font-bold">{data.secondaryLabel || data.name}</p>
           </div>
           <div className="space-y-1">
@@ -377,7 +355,7 @@ export default function BivariateChart({
     }
 
     return (
-      <div className="bg-white p-3 border rounded shadow">
+      <div className={`p-3 border rounded shadow ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>
         <p className="font-medium border-b pb-1 mb-2">{payload[0].payload.name}</p>
         {payload.map((entry, index) => {
           if (entry.dataKey.includes('_')) return null; // Skip the metadata fields
@@ -425,7 +403,7 @@ export default function BivariateChart({
     const shouldShowLabel = width > minWidthForLabel && height > minHeightForLabel;
 
     // Usar las variaciones de color para todos los rectángulos
-    const color = colorScheme[mainKey]?.variations[colorIndex] || "#3182ce";
+    const color = colorScheme[mainKey]?.variations[colorIndex] || (darkMode ? "#3b82f6" : "#3182ce");
 
     // Format the label based on viewMode
     const getFormattedLabel = () => {
@@ -444,7 +422,7 @@ export default function BivariateChart({
           width={width}
           height={height}
           fill={color}
-          stroke="#fff"
+          stroke={darkMode ? "#1f2937" : "#fff"}
         />
         {shouldShowLabel && (
           <text
@@ -466,24 +444,35 @@ export default function BivariateChart({
   };
 
   const getChartColors = (length) => {
+    const saturation = darkMode ? 80 : 70;
+    const lightness = darkMode ? 55 : 50;
+    
     return Array.from({ length }, (_, i) => 
-      `hsl(${(i * 360) / length}, 70%, 50%)`
+      `hsl(${(i * 360) / length}, ${saturation}%, ${lightness}%)`
     );
   };
 
+  const getAxisTickStyles = () => {
+    return { 
+      fontSize: 12,
+      fontWeight: "500",
+      fill: darkMode ? '#e5e7eb' : '#374151'
+    };
+  };
+
   return (
-    <div className="p-4 border rounded-md bg-white shadow">
+    <div className={`p-4 border rounded-lg shadow transition-colors duration-200 ${darkMode ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-800 border-gray-200'}`}>
       <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
         <h3 className="text-lg font-semibold">
           {contingencyData.metadatos.variable1.etiqueta} vs {contingencyData.metadatos.variable2.etiqueta}
         </h3>
         <div className="flex flex-wrap gap-4">
           <div>
-            <label className="font-medium mr-2">Mostrar valores:</label>
+            <label className={`font-medium mr-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Mostrar valores:</label>
             <select
               value={viewMode}
               onChange={(e) => setViewMode(e.target.value)}
-              className="border p-2 rounded-md"
+              className={`border p-2 rounded ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'}`}
             >
               <option value="absolute">Absolutos</option>
               <option value="relative">Relativos ({getRelativeModeExplanation()})</option>
@@ -493,16 +482,21 @@ export default function BivariateChart({
             onClick={handleExportChart}
             disabled={exporting}
             className={`
-              px-3 py-1.5 rounded-md text-sm font-medium
+              px-3 py-1.5 rounded text-sm font-medium
               flex items-center gap-2
-              ${exporting ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}
+              ${exporting 
+                ? (darkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-300 text-gray-500') 
+                : (darkMode 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700')
+              }
               transition-colors duration-200
             `}
             title="Exportar gráfico como imagen"
           >
             {exporting ? (
               <>
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -521,8 +515,8 @@ export default function BivariateChart({
       </div>
       
       {totalExcluded > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
-          <p className="text-sm text-blue-800">
+        <div className={`mb-4 p-3 rounded ${darkMode ? 'bg-blue-900/20 border border-blue-900/30 text-blue-200' : 'bg-blue-50 border border-blue-100 text-blue-800'}`}>
+          <p className="text-sm">
             <span className="font-medium">Valores excluidos:</span> {totalExcluded} respuestas
             {excludedValues1.length > 0 && ` (${excludedValues1.length} de ${variable1})`}
             {excludedValues2.length > 0 && ` (${excludedValues2.length} de ${variable2})`}
@@ -539,7 +533,7 @@ export default function BivariateChart({
                 className="w-4 h-4 rounded mr-2"
                 style={{ backgroundColor: scheme.base }}
               />
-              <span className="text-sm">
+              <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 {contingencyData.datos.filas[key].etiqueta}
               </span>
             </div>
@@ -547,19 +541,19 @@ export default function BivariateChart({
         </div>
       )}
 
-      <div ref={chartContainerRef} className="h-[550px] bg-white">
+      <div ref={chartContainerRef} className={`h-[550px] ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
         {/* Título del gráfico para la exportación */}
-        <div className="text-center py-3 border-b mb-2">
-          <h2 className="text-xl font-bold text-gray-800">Análisis Bivariado</h2>
-          <p className="text-base text-gray-700 mt-1">
+        <div className={`text-center py-3 border-b mb-2 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Análisis Bivariado</h2>
+          <p className={`text-base mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
             {variable1Title} vs {variable2Title}
           </p>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             Gráfico de {getChartTypeName()}
             {viewMode === 'relative' && ` - Valores relativos (${getRelativeModeExplanation()})`}
           </p>
           {totalExcluded > 0 && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
               {totalExcluded} valores excluidos
               {excludedValues1.length > 0 && ` (${excludedValues1.length} de ${variable1})`}
               {excludedValues2.length > 0 && ` (${excludedValues2.length} de ${variable2})`}
@@ -574,7 +568,7 @@ export default function BivariateChart({
                 data={prepareTreemapData()}
                 dataKey="size"
                 ratio={4/3}
-                stroke="#fff"
+                stroke={darkMode ? "#1f2937" : "#fff"}
                 content={<CustomizedContent />}
               >
                 <Tooltip content={<CustomTooltip />} />
@@ -582,49 +576,43 @@ export default function BivariateChart({
             ) : (
               <BarChart 
                 data={prepareStackedBarData()}
-                margin={
-                  windowWidth < 768 
-                    ? { top: 20, right: 30, left: 0, bottom: 120 }
-                    : { top: 20, right: 30, left: 20, bottom: 70 }
-                }
+                margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'} />
                 <XAxis 
                   dataKey="name"
-                  tick={{ 
-                    fontSize: windowWidth < 768 ? 10 : 12,
-                    fontWeight: "500",
-                    width: 120
-                  }}
+                  tick={getAxisTickStyles()}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
-                  height={windowWidth < 768 ? 100 : 70}
+                  height={70}
+                  axisLine={{ stroke: darkMode ? '#525252' : '#e5e7eb' }}
+                  tickLine={{ stroke: darkMode ? '#525252' : '#e5e7eb' }}
                 />
                 <YAxis 
-                  label={
-                    windowWidth < 768 
-                      ? null
-                      : (viewMode !== 'absolute' 
-                          ? { value: 'Porcentaje (%)', angle: -90, position: 'insideLeft', dy: -10 }
-                          : { value: 'Frecuencia', angle: -90, position: 'insideLeft', dy: -10 }
-                        )
-                  }
-                  tick={{ 
-                    fontSize: windowWidth < 768 ? 11 : 12,
-                    fontWeight: "500"
+                  label={{
+                    value: viewMode !== 'absolute' ? 'Porcentaje (%)' : 'Frecuencia',
+                    angle: -90,
+                    position: 'insideLeft',
+                    dy: -10,
+                    style: {
+                      fill: darkMode ? '#e5e7eb' : '#374151'
+                    }
                   }}
+                  tick={getAxisTickStyles()}
+                  axisLine={{ stroke: darkMode ? '#525252' : '#e5e7eb' }}
+                  tickLine={{ stroke: darkMode ? '#525252' : '#e5e7eb' }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{ 
                     paddingTop: 10, 
-                    fontSize: windowWidth < 768 ? 10 : 12,
+                    fontSize: 12,
                     fontWeight: "500",
                     width: '100%',
-                    marginLeft: windowWidth < 768 ? -20 : 0 
+                    color: darkMode ? '#e5e7eb' : '#374151'
                   }} 
-                  iconSize={windowWidth < 768 ? 8 : 10}
+                  iconSize={10}
                   iconType="square"
                 />
                 {Object.entries(contingencyData.datos.columnas)
