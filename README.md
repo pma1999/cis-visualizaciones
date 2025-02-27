@@ -6,7 +6,7 @@
 
 Una aplicación web moderna para explorar, analizar y visualizar datos sociológicos del Centro de Investigaciones Sociológicas (CIS) de España.
 
-![Captura de pantalla de la aplicación](https://via.placeholder.com/800x400?text=Visualizador+de+Datos+CIS)
+![Captura de pantalla de la aplicación](frontend\public\assets\screenshot.png)
 
 ## 🔍 Demo en vivo
 
@@ -49,7 +49,7 @@ Puedes probar una versión en vivo de la aplicación aquí: [https://cis-visuali
 
 1. Clona el repositorio:
    ```bash
-   git clone https://github.com/tu-usuario/cis-visualizaciones.git
+   git clone https://github.com/pma1999/cis-visualizaciones.git
    cd cis-visualizaciones
    ```
 
