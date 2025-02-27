@@ -148,15 +148,15 @@ export default function FullscreenChartPage() {
   return (
     <div className={`min-h-screen ${chartConfig.darkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"}`}>
       {/* Header with controls */}
-      <header className={`fixed top-0 left-0 right-0 z-10 ${chartConfig.darkMode ? "bg-gray-800/90" : "bg-white/90"} backdrop-blur-sm shadow-md px-4 py-3`}>
+      <header className={`fixed top-0 left-0 right-0 z-10 ${chartConfig.darkMode ? "bg-gray-800/90" : "bg-white/90"} backdrop-blur-sm shadow-md px-2 sm:px-4 py-2 sm:py-3`}>
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-y-2">
           <div className="flex items-center">
-            <Link to="/analysis" className={`mr-3 p-2 rounded-lg ${chartConfig.darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors`} aria-label="Volver al análisis">
+            <Link to="/analysis" className={`mr-2 sm:mr-3 p-1.5 sm:p-2 rounded-lg ${chartConfig.darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors`} aria-label="Volver al análisis">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </Link>
-            <h1 className="text-lg font-semibold mr-4 truncate max-w-[250px] sm:max-w-sm">
+            <h1 className="text-base sm:text-lg font-semibold mr-4 truncate max-w-[200px] sm:max-w-sm">
               {getPageTitle()}
             </h1>
             <div className="hidden md:flex items-center text-xs">
@@ -169,15 +169,15 @@ export default function FullscreenChartPage() {
             </div>
           </div>
           
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <div className="relative">
               <button
                 onClick={copyToClipboard}
-                className={`p-2 rounded-lg ${chartConfig.darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors`}
+                className={`p-1.5 sm:p-2 rounded-lg ${chartConfig.darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors`}
                 aria-label="Compartir gráfico"
                 title="Compartir gráfico"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
               </button>
@@ -190,16 +190,16 @@ export default function FullscreenChartPage() {
             
             <button
               onClick={toggleDarkMode}
-              className={`p-2 rounded-lg ${chartConfig.darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors`}
+              className={`p-1.5 sm:p-2 rounded-lg ${chartConfig.darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors`}
               aria-label={chartConfig.darkMode ? "Activar modo claro" : "Activar modo oscuro"}
               title={chartConfig.darkMode ? "Activar modo claro" : "Activar modo oscuro"}
             >
               {chartConfig.darkMode ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               )}
@@ -208,7 +208,7 @@ export default function FullscreenChartPage() {
             {actualChartType === "univariate" && (
               <div>
                 <select
-                  className={`text-sm rounded-lg p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
+                  className={`text-xs sm:text-sm rounded-lg p-1 sm:p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
                   value={chartConfig.chartType}
                   onChange={(e) => setChartConfig(prev => ({ ...prev, chartType: e.target.value }))}
                 >
@@ -222,7 +222,7 @@ export default function FullscreenChartPage() {
             {actualChartType === "bivariate" && (
               <div>
                 <select
-                  className={`text-sm rounded-lg p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
+                  className={`text-xs sm:text-sm rounded-lg p-1 sm:p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
                   value={chartConfig.chartType}
                   onChange={(e) => setChartConfig(prev => ({ ...prev, chartType: e.target.value }))}
                 >
@@ -232,9 +232,9 @@ export default function FullscreenChartPage() {
             )}
             
             {actualChartType === "univariate" && (
-              <div>
+              <div className="hidden sm:block">
                 <select
-                  className={`text-sm rounded-lg p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
+                  className={`text-xs sm:text-sm rounded-lg p-1 sm:p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
                   value={chartConfig.sortOrder}
                   onChange={(e) => setChartConfig(prev => ({ ...prev, sortOrder: e.target.value }))}
                 >
@@ -247,7 +247,7 @@ export default function FullscreenChartPage() {
             {actualChartType === "bivariate" && (
               <div>
                 <select
-                  className={`text-sm rounded-lg p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
+                  className={`text-xs sm:text-sm rounded-lg p-1 sm:p-2 ${chartConfig.darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"} border`}
                   value={chartConfig.viewMode}
                   onChange={(e) => setChartConfig(prev => ({ ...prev, viewMode: e.target.value }))}
                 >
@@ -260,11 +260,11 @@ export default function FullscreenChartPage() {
         </div>
       </header>
       
-      {/* Main chart container */}
-      <main className="pt-20 px-4 pb-10 max-w-7xl mx-auto">
-        <div className="h-[calc(100vh-130px)] w-full flex items-center justify-center">
+      {/* Main chart container - Optimized height calculation */}
+      <main className="pt-12 sm:pt-16 md:pt-20 px-2 sm:px-4 pb-3 sm:pb-6 md:pb-10 max-w-7xl mx-auto">
+        <div className="h-[calc(100vh-70px)] sm:h-[calc(100vh-90px)] md:h-[calc(100vh-120px)] w-full flex items-center justify-center">
           {actualChartType === "univariate" ? (
-            <div className="w-full h-full" style={{ minHeight: '400px' }}>
+            <div className="w-full h-full">
               <ChartComponent
                 variable={variable1}
                 chartType={chartConfig.chartType}
@@ -278,7 +278,7 @@ export default function FullscreenChartPage() {
               />
             </div>
           ) : (
-            <div className="w-full h-full" style={{ minHeight: '400px', minWidth: '300px' }}>
+            <div className="w-full h-full">
               <BivariateChart
                 variable1={variable1}
                 variable2={variable2}
@@ -293,23 +293,23 @@ export default function FullscreenChartPage() {
         </div>
       </main>
       
-      {/* Footer with metadata */}
-      <footer className={`fixed bottom-0 left-0 right-0 ${chartConfig.darkMode ? "bg-gray-800/90" : "bg-white/90"} backdrop-blur-sm shadow-[0_-2px_5px_rgba(0,0,0,0.1)] px-4 py-2`}>
-        <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center text-xs">
+      {/* Footer with metadata - More compact for mobile */}
+      <footer className={`fixed bottom-0 left-0 right-0 ${chartConfig.darkMode ? "bg-gray-800/90" : "bg-white/90"} backdrop-blur-sm shadow-[0_-2px_5px_rgba(0,0,0,0.1)] px-2 sm:px-4 py-1 sm:py-2`}>
+        <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center text-[10px] sm:text-xs">
           <div className="flex flex-wrap items-center">
-            <span className="mr-3 font-medium">Variable{actualChartType === "bivariate" ? "s" : ""}: </span>
-            <span className={`px-2 py-1 rounded-md ${chartConfig.darkMode ? "bg-gray-700" : "bg-gray-100"} mr-2`}>
+            <span className="mr-2 sm:mr-3 font-medium">Variable{actualChartType === "bivariate" ? "s" : ""}: </span>
+            <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md ${chartConfig.darkMode ? "bg-gray-700" : "bg-gray-100"} mr-2`}>
               {variable1} - {variableData.var1?.label}
             </span>
             {actualChartType === "bivariate" && (
-              <span className={`px-2 py-1 rounded-md ${chartConfig.darkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+              <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md ${chartConfig.darkMode ? "bg-gray-700" : "bg-gray-100"}`}>
                 {variable2} - {variableData.var2?.label}
               </span>
             )}
           </div>
-          <div className={`${chartConfig.darkMode ? "text-gray-400" : "text-gray-500"} mt-1 sm:mt-0`}>
+          <div className={`${chartConfig.darkMode ? "text-gray-400" : "text-gray-500"} mt-0.5 sm:mt-0`}>
             {chartConfig.excludedValues1.length > 0 && (
-              <span className="mr-3">Valores excluidos: {chartConfig.excludedValues1.length}</span>
+              <span className="mr-2 sm:mr-3">Valores excluidos: {chartConfig.excludedValues1.length}</span>
             )}
             {actualChartType === "bivariate" && chartConfig.excludedValues2.length > 0 && (
               <span>Valores excluidos (var2): {chartConfig.excludedValues2.length}</span>

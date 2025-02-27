@@ -142,11 +142,14 @@ export default function BivariateChart({
   // Adjust chart options based on zoom
   useEffect(() => {
     if (chartInstance && zoom !== 100) {
+      // Calculate a better aspect ratio for mobile
+      const baseAspectRatio = windowWidth < 640 ? 1.2 : 1.6;
+      
       // Adjust chart aspect ratio based on zoom
-      chartInstance.options.aspectRatio = 1.6 * (100 / zoom);
+      chartInstance.options.aspectRatio = baseAspectRatio * (100 / zoom);
       chartInstance.update();
     }
-  }, [zoom, chartInstance]);
+  }, [zoom, chartInstance, windowWidth]);
 
   // Preparar los datos según el tipo de gráfico
   const getChartData = () => {
@@ -237,6 +240,9 @@ export default function BivariateChart({
       };
     });
     
+    // Calculate appropriate base aspect ratio based on screen width
+    const baseAspectRatio = windowWidth < 640 ? 1.2 : 1.6;
+    
     return {
       type: 'bar',
       data: {
@@ -245,7 +251,8 @@ export default function BivariateChart({
       },
       options: {
         responsive: true,
-        aspectRatio: 1.6,
+        aspectRatio: baseAspectRatio, // Changed to dynamic based on screen width
+        maintainAspectRatio: !isFullscreenPage, // Don't maintain aspect ratio in fullscreen mode
         plugins: {
           tooltip: {
             callbacks: {
@@ -277,9 +284,9 @@ export default function BivariateChart({
             position: 'bottom',
             labels: {
               boxWidth: 15,
-              padding: 15,
+              padding: windowWidth < 640 ? 8 : 15,
               font: {
-                size: 12
+                size: windowWidth < 640 ? 10 : 12
               }
             }
           }
@@ -291,7 +298,10 @@ export default function BivariateChart({
             },
             ticks: {
               maxRotation: 45,
-              minRotation: 0
+              minRotation: 0,
+              font: {
+                size: windowWidth < 640 ? 10 : 12
+              }
             }
           },
           y: {
@@ -303,7 +313,15 @@ export default function BivariateChart({
             title: {
               display: true,
               text: localViewMode === 'relative' ? 'Porcentaje (%)' : 'Frecuencia',
-              color: darkMode ? '#e5e7eb' : '#374151'
+              color: darkMode ? '#e5e7eb' : '#374151',
+              font: {
+                size: windowWidth < 640 ? 11 : 12
+              }
+            },
+            ticks: {
+              font: {
+                size: windowWidth < 640 ? 10 : 12
+              }
             }
           }
         }
@@ -394,16 +412,18 @@ export default function BivariateChart({
           className={`overflow-hidden rounded-lg ${
             isFullscreen 
               ? 'bg-black w-screen h-screen flex items-center justify-center' 
-              : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-4 ${isFullscreenPage ? 'h-full' : 'h-[500px]'}`
+              : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-2 sm:p-4 ${isFullscreenPage ? 'h-full' : 'h-[350px] sm:h-[500px]'}`
           }`}
-          style={{ minHeight: isFullscreenPage ? '500px' : undefined }}
+          style={{ 
+            minHeight: isFullscreenPage ? '100%' : undefined
+          }}
         >
           <canvas 
             ref={chartRef}
             className="w-full h-full"
             style={{ 
-              maxHeight: isFullscreen ? '90vh' : isFullscreenPage ? '100%' : '450px',
-              maxWidth: isFullscreen ? '90vw' : '100%'
+              maxHeight: isFullscreen ? '95vh' : isFullscreenPage ? '100%' : undefined,
+              maxWidth: isFullscreen ? '95vw' : '100%'
             }}
           />
         </div>
