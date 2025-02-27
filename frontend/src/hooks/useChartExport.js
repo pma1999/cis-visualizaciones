@@ -16,7 +16,7 @@ const useChartExport = () => {
    * @param {Object} chartInfo - Información sobre el gráfico para la exportación
    * @param {string} chartInfo.variable1Title - Título de la primera variable
    * @param {string} chartInfo.variable2Title - Título de la segunda variable
-   * @param {string} chartInfo.chartType - Tipo de gráfico (treemap, stacked)
+   * @param {string} chartInfo.chartType - Tipo de gráfico (stacked)
    * @param {string} chartInfo.viewMode - Modo de visualización (absolute, relative)
    * @param {boolean} chartInfo.darkMode - Si se está usando el modo oscuro
    * @param {number} chartInfo.excludedValues1 - Cantidad de valores excluidos de la primera variable
@@ -25,7 +25,7 @@ const useChartExport = () => {
   const handleExportChart = async ({ 
     variable1Title = '', 
     variable2Title = '', 
-    chartType = 'treemap', 
+    chartType = 'stacked', 
     viewMode = 'absolute', 
     darkMode = false, 
     excludedValues1 = 0,
@@ -38,7 +38,7 @@ const useChartExport = () => {
       // Preparar opciones para la exportación
       const options = {
         title: `Análisis bivariado de ${variable1Title} y ${variable2Title}`,
-        subtitle: `Tipo de gráfico: ${chartType === 'treemap' ? 'Mapa de árbol' : 'Barras apiladas'}`,
+        subtitle: `Tipo de gráfico: Barras apiladas`,
         description: `Modo de visualización: ${viewMode === 'absolute' ? 'Valores absolutos' : 'Porcentajes'}`,
         darkMode: darkMode,
         chartType: chartType,
@@ -61,7 +61,7 @@ const useChartExport = () => {
       };
       
       // Nombre del archivo
-      const filename = `grafico_bivariado_${variable1Title.replace(/\s+/g, '_')}_${variable2Title.replace(/\s+/g, '_')}_${chartType}_${getFormattedDate()}`;
+      const filename = `grafico_bivariado_${variable1Title.replace(/\s+/g, '_')}_${variable2Title.replace(/\s+/g, '_')}_barras_${getFormattedDate()}`;
       
       // Esperar a que el componente esté completamente renderizado
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -86,7 +86,7 @@ const useChartExport = () => {
    * @param {Object} chartInfo - Información sobre el gráfico para abrir en nueva pestaña
    * @param {string} chartInfo.variable1 - Nombre de la primera variable
    * @param {string} chartInfo.variable2 - Nombre de la segunda variable
-   * @param {string} chartInfo.chartType - Tipo de gráfico (treemap, stacked)
+   * @param {string} chartInfo.chartType - Tipo de gráfico (stacked)
    * @param {string} chartInfo.viewMode - Modo de visualización (absolute, relative)
    * @param {boolean} chartInfo.darkMode - Si se está usando el modo oscuro
    * @param {string[]} chartInfo.excludedValues1 - Valores excluidos de la primera variable
@@ -95,7 +95,7 @@ const useChartExport = () => {
   const openInNewTab = ({ 
     variable1, 
     variable2, 
-    chartType = 'treemap', 
+    chartType = 'stacked', 
     viewMode = 'absolute', 
     darkMode = false, 
     excludedValues1 = [], 

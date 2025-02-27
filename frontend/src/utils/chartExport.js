@@ -259,23 +259,20 @@ const prepareChartForExport = (originalChartElement, container, options) => {
  * @returns {Object} Información extraída del gráfico
  */
 const extractChartInfo = (chartElement) => {
-  if (!chartElement) return {};
-  
   const info = {
     title: '',
     subtitle: '',
     description: '',
-    legendItems: [],
-    footnote: ''
+    legendItems: []
   };
   
-  // Extraer título y subtítulo
-  const titleElement = chartElement.querySelector('h2, .chart-title');
+  // Extraer título si existe
+  const titleElement = chartElement.querySelector('h3');
   if (titleElement) {
     info.title = titleElement.textContent.trim();
   }
   
-  const subtitleElement = chartElement.querySelector('p:not(.text-xs), .chart-subtitle');
+  const subtitleElement = chartElement.querySelector('.chart-subtitle');
   if (subtitleElement) {
     info.subtitle = subtitleElement.textContent.trim();
   }
@@ -285,21 +282,20 @@ const extractChartInfo = (chartElement) => {
     info.description = descriptionElement.textContent.trim();
   }
   
-  // Extraer elementos de leyenda si existen
-  const legendElements = chartElement.querySelectorAll('.recharts-legend-item');
+  // Extraer elementos de leyenda de Chart.js si existen
+  // Chart.js crea elementos li para la leyenda
+  const legendElements = chartElement.querySelectorAll('canvas + div ul li');
   if (legendElements && legendElements.length) {
     legendElements.forEach(item => {
-      const colorElement = item.querySelector('.recharts-legend-icon');
-      const textElement = item.querySelector('.recharts-legend-item-text');
+      const colorBoxElement = item.querySelector('span');
+      const textContent = item.textContent.trim();
       
-      if (colorElement && textElement) {
-        const color = window.getComputedStyle(colorElement).fill || 
-                      window.getComputedStyle(colorElement).backgroundColor ||
-                      '#333';
+      if (colorBoxElement && textContent) {
+        const color = window.getComputedStyle(colorBoxElement).backgroundColor || '#333';
         
         info.legendItems.push({
           color: color,
-          text: textElement.textContent
+          text: textContent
         });
       }
     });

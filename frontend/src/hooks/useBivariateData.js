@@ -94,57 +94,6 @@ const useBivariateData = (variable1, variable2, excludedValues1 = [], excludedVa
   }, [originalData, excludedValues1, excludedValues2, darkMode]);
 
   /**
-   * Prepara los datos para el gráfico de mapa de árbol (Treemap)
-   * @param {string} viewMode - Modo de visualización (absolute o relative)
-   * @returns {Array} Datos formateados para el Treemap
-   */
-  const prepareTreemapData = (viewMode) => {
-    if (!contingencyData) return [];
-    
-    return Object.entries(contingencyData.datos.filas)
-      .filter(([key]) => key !== "All")
-      .flatMap(([key, row]) => 
-        Object.entries(row.valores)
-          .filter(([colKey]) => colKey !== "All")
-          .map(([colKey, valor], index) => {
-            // Para treemap, usamos porcentaje del total en modo relativo
-            const totalValue = contingencyData.datos.filas["All"]?.valores["All"]?.frecuencia || 0;
-            const percentTotal = totalValue > 0 ? (valor.frecuencia / totalValue) * 100 : 0;
-            
-            // Determine the value to display based on viewMode
-            let displayValue;
-            let sizeValue;
-            
-            if (viewMode === 'relative') {
-              displayValue = percentTotal;
-              sizeValue = percentTotal;
-            } else { // 'absolute'
-              displayValue = valor.frecuencia;
-              sizeValue = valor.frecuencia;
-            }
-            
-            return {
-              name: contingencyData.datos.columnas[colKey].etiqueta,
-              secondaryLabel: contingencyData.datos.columnas[colKey].etiqueta,
-              secondaryVariable: contingencyData.metadatos.variable2.etiqueta,
-              mainVariable: contingencyData.metadatos.variable1.etiqueta,
-              mainValue: row.etiqueta,
-              mainKey: key,
-              colorIndex: index,
-              size: sizeValue,
-              value: displayValue,
-              displayValue: displayValue,
-              viewMode: viewMode,
-              frecuencia: valor.frecuencia,
-              percentRow: valor.porcentaje_fila,
-              percentCol: valor.porcentaje_columna,
-              percentTotal: percentTotal
-            };
-          })
-      );
-  };
-
-  /**
    * Prepara los datos para el gráfico de barras apiladas
    * @param {string} viewMode - Modo de visualización (absolute o relative)
    * @returns {Array} Datos formateados para el gráfico de barras apiladas
@@ -179,13 +128,9 @@ const useBivariateData = (variable1, variable2, excludedValues1 = [], excludedVa
       });
   };
 
-  // Obtener explicación del modo relativo según el tipo de gráfico
-  const getRelativeModeExplanation = (chartType) => {
-    if (chartType === 'treemap') {
-      return 'Porcentajes del total';
-    } else { // stacked
-      return 'Porcentajes por fila';
-    }
+  // Obtener explicación del modo relativo
+  const getRelativeModeExplanation = () => {
+    return 'Porcentajes por fila';
   };
 
   return {
@@ -193,7 +138,6 @@ const useBivariateData = (variable1, variable2, excludedValues1 = [], excludedVa
     colorScheme,
     variable1Title,
     variable2Title,
-    prepareTreemapData,
     prepareStackedBarData,
     getRelativeModeExplanation,
     totalExcluded: excludedValues1.length + excludedValues2.length,

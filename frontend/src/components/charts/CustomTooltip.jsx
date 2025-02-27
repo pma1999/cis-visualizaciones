@@ -1,43 +1,10 @@
 import React from 'react';
 
 /**
- * Componente de tooltip personalizado para los gráficos bivariados
+ * Componente de tooltip personalizado para los gráficos de barras apiladas
  */
-const CustomTooltip = ({ active, payload, chartType, darkMode, localViewMode }) => {
+const CustomTooltip = ({ active, payload, darkMode, localViewMode }) => {
   if (!active || !payload || !payload.length) return null;
-
-  if (chartType === "treemap") {
-    const data = payload[0].payload;
-    return (
-      <div className={`p-3 border rounded shadow ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>
-        <div className="border-b pb-2 mb-2">
-          <p className={`font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{data.mainVariable}</p>
-          <p className="font-bold">{data.mainValue || data.mainLabel}</p>
-        </div>
-        <div className="border-b pb-2 mb-2">
-          <p className={`font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{data.secondaryVariable}</p>
-          <p className="font-bold">{data.secondaryLabel || data.name}</p>
-        </div>
-        <div className="space-y-1">
-          <p>
-            <span className="font-medium">
-              {localViewMode === 'absolute' 
-                ? 'Frecuencia:' 
-                : 'Porcentaje del total:'}
-            </span> 
-            {localViewMode === 'absolute' 
-              ? data.frecuencia 
-              : `${data.percentTotal?.toFixed(2)}%`}
-          </p>
-          {localViewMode === 'relative' && 
-            <p><span className="font-medium">Frecuencia:</span> {data.frecuencia}</p>
-          }
-          <p><span className="font-medium">% Fila:</span> {data.percentRow?.toFixed(2)}%</p>
-          <p><span className="font-medium">% Columna:</span> {data.percentCol?.toFixed(2)}%</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`p-3 border rounded shadow ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>

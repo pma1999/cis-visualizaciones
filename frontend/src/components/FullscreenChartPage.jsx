@@ -15,7 +15,7 @@ export default function FullscreenChartPage() {
   
   // Chart configuration from URL parameters
   const [chartConfig, setChartConfig] = useState({
-    chartType: searchParams.get("chartType") || (actualChartType === "univariate" ? "bar" : "treemap"),
+    chartType: searchParams.get("chartType") || (actualChartType === "univariate" ? "bar" : "stacked"),
     sortOrder: searchParams.get("sortOrder") || "code",
     excludedValues1: searchParams.get("excludedValues1") ? 
       searchParams.get("excludedValues1").split(",") : [],
@@ -164,7 +164,7 @@ export default function FullscreenChartPage() {
                 {actualChartType === "univariate" ? "Univariado" : "Bivariado"}
               </span>
               <span className={`ml-2 px-2 py-1 rounded-full ${chartConfig.darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"}`}>
-                {actualChartType === "univariate" ? chartConfig.chartType : chartConfig.chartType === "treemap" ? "Mapa de árbol" : "Barras apiladas"}
+                {actualChartType === "univariate" ? chartConfig.chartType : "Barras apiladas"}
               </span>
             </div>
           </div>
@@ -226,7 +226,6 @@ export default function FullscreenChartPage() {
                   value={chartConfig.chartType}
                   onChange={(e) => setChartConfig(prev => ({ ...prev, chartType: e.target.value }))}
                 >
-                  <option value="treemap">Mapa de árbol</option>
                   <option value="stacked">Barras apiladas</option>
                 </select>
               </div>
@@ -283,7 +282,6 @@ export default function FullscreenChartPage() {
               <BivariateChart
                 variable1={variable1}
                 variable2={variable2}
-                chartType={chartConfig.chartType}
                 excludedValues1={chartConfig.excludedValues1}
                 excludedValues2={chartConfig.excludedValues2}
                 darkMode={chartConfig.darkMode}

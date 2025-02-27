@@ -14,7 +14,7 @@ export default function AnalysisPage() {
   const [selectedVariable, setSelectedVariable] = useState(null);
   const [secondaryVariable, setSecondaryVariable] = useState(null);
   const [chartType, setChartType] = useState("bar");
-  const [bivariateChartType, setBivariateChartType] = useState("treemap");
+  const [bivariateChartType, setBivariateChartType] = useState("stacked");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('table');
   const [sortOrder, setSortOrder] = useState('code');
@@ -72,7 +72,7 @@ export default function AnalysisPage() {
     setSelectedVariable(null);
     setSecondaryVariable(null);
     setChartType("bar");
-    setBivariateChartType("treemap");
+    setBivariateChartType("stacked");
     setIsSidebarOpen(false);
     setActiveTab('table');
     setSortOrder('code');
@@ -403,7 +403,6 @@ export default function AnalysisPage() {
                             value={bivariateChartType}
                             onChange={(e) => setBivariateChartType(e.target.value)}
                           >
-                            <option value="treemap">Mapa de árbol</option>
                             <option value="stacked">Barras apiladas</option>
                           </select>
                         </div>
@@ -511,7 +510,6 @@ export default function AnalysisPage() {
                           <BivariateChart 
                             variable1={selectedVariable.code} 
                             variable2={secondaryVariable.code}
-                            chartType={bivariateChartType}
                             excludedValues1={excludedPrimaryValues}
                             excludedValues2={excludedSecondaryValues}
                             darkMode={darkMode}
