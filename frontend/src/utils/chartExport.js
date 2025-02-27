@@ -98,10 +98,17 @@ export const exportAsImage = async (element, filename, options = {}) => {
     // Mostrar un indicador de carga o feedback al usuario
     const originalPosition = element.style.position;
     const originalZIndex = element.style.zIndex;
+    const originalOverflow = element.style.overflow;
+    const originalPadding = element.style.padding;
     
-    // Asegurarse de que el elemento es visible para la captura
+    // Asegurarse de que el elemento es visible y completamente renderizado para la captura
     element.style.position = 'relative';
     element.style.zIndex = '9999';
+    element.style.overflow = 'visible'; // Importante para evitar que el contenido se corte
+    element.style.padding = '10px'; // Añadir padding adicional para evitar cortes
+    
+    // Esperar un tick para que los cambios de estilo se apliquen
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Reemplazar temporalmente colores no compatibles
     const modifiedElements = handleColorCompatibility(element);
@@ -113,6 +120,12 @@ export const exportAsImage = async (element, filename, options = {}) => {
       allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
+      windowWidth: document.documentElement.offsetWidth,
+      windowHeight: document.documentElement.offsetHeight,
+      x: -10, // Capturar un poco más allá del borde para evitar cortes
+      y: -10,
+      width: element.offsetWidth + 20, // Añadir margen para evitar cortes
+      height: element.offsetHeight + 20,
       ...options
     };
     
@@ -125,6 +138,8 @@ export const exportAsImage = async (element, filename, options = {}) => {
     // Restaurar estilos originales del elemento principal
     element.style.position = originalPosition;
     element.style.zIndex = originalZIndex;
+    element.style.overflow = originalOverflow;
+    element.style.padding = originalPadding;
     
     // Convertir a imagen y descargar
     const image = canvas.toDataURL('image/png', 1.0);

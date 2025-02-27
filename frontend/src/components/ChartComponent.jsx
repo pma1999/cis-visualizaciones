@@ -13,6 +13,24 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
   const [exporting, setExporting] = useState(false);
   const [variableTitle, setVariableTitle] = useState('');
   const chartContainerRef = useRef(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize);
+      handleResize();
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleResize);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -22,14 +40,12 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
       const metadata = await response.json();
       const etiquetas = metadata.etiquetas_valores[variable] || {};
       
-      // Obtener el título completo de la variable desde los metadatos
       if (metadata.variables && metadata.variables[variable]) {
         setVariableTitle(metadata.variables[variable].etiqueta || variable);
       } else {
         setVariableTitle(variable);
       }
 
-      // Filtrar los valores excluidos
       const filteredDist = { ...dist };
       excludedValues.forEach(code => {
         delete filteredDist[code];
@@ -42,7 +58,6 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
         color: COLORS[Object.keys(filteredDist).indexOf(code) % COLORS.length]
       }));
 
-      // Ordenar los datos según sortOrder
       formattedData.sort((a, b) => {
         if (sortOrder === 'code') {
           return Number(a.code) - Number(b.code);
@@ -58,7 +73,7 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
     if (variable) {
       fetchData();
     }
-  }, [variable, sortOrder, excludedValues]); // Añadir excludedValues como dependencia
+  }, [variable, sortOrder, excludedValues]);
 
   const handleExportChart = async () => {
     if (!chartContainerRef.current) return;
@@ -83,7 +98,6 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
     );
   }
 
-  // Obtener nombre del tipo de gráfico para el título
   const getChartTypeName = () => {
     switch(chartType) {
       case 'bar': return 'barras';
@@ -135,8 +149,7 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
         </div>
       )}
       
-      <div ref={chartContainerRef} className="h-[300px] md:h-[400px] w-full bg-white">
-        {/* Título del gráfico para la exportación */}
+      <div ref={chartContainerRef} className="h-[350px] md:h-[450px] w-full bg-white">
         <div className="text-center py-3 border-b mb-2">
           <h2 className="text-xl font-bold text-gray-800">{variableTitle}</h2>
           <p className="text-sm text-gray-600">Gráfico de {getChartTypeName()}</p>
@@ -150,42 +163,68 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
         <div className="h-[calc(100%-60px)]">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === "bar" && (
-              <BarChart data={chartData}>
+              <BarChart 
+                data={chartData}
+                margin={
+                  windowWidth < 768 
+                    ? { top: 10, right: 20, left: 0, bottom: 100 }
+                    : { top: 10, right: 30, left: 10, bottom: 65 }
+                }
+              >
                 <XAxis 
                   dataKey="label" 
-                  tick={{ fontSize: 10, width: 50 }}
+                  tick={{ fontSize: windowWidth < 768 ? 8 : 10, width: 50 }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
-                  height={60}
+                  height={windowWidth < 768 ? 90 : 65}
                 />
-                <YAxis tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: windowWidth < 768 ? 10 : 12 }} />
                 <Tooltip />
                 <Bar dataKey="frequency" fill="#007bff" />
               </BarChart>
             )}
             {chartType === "line" && (
-              <LineChart data={chartData}>
+              <LineChart 
+                data={chartData}
+                margin={
+                  windowWidth < 768 
+                    ? { top: 10, right: 20, left: 0, bottom: 100 }
+                    : { top: 10, right: 30, left: 10, bottom: 65 }
+                }
+              >
                 <XAxis 
                   dataKey="label" 
-                  tick={{ fontSize: 10, width: 50 }}
+                  tick={{ fontSize: windowWidth < 768 ? 8 : 10, width: 50 }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
-                  height={60}
+                  height={windowWidth < 768 ? 90 : 65}
                 />
-                <YAxis tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: windowWidth < 768 ? 10 : 12 }} />
                 <Tooltip />
                 <Line type="monotone" dataKey="frequency" stroke="#007bff" />
               </LineChart>
             )}
             {chartType === "pie" && (
-              <PieChart>
+              <PieChart 
+                margin={
+                  windowWidth < 768 
+                    ? { top: 10, right: 10, left: 10, bottom: 10 }
+                    : { top: 10, right: 30, left: 30, bottom: 30 }
+                }
+              >
                 <Pie 
                   data={chartData} 
                   dataKey="frequency" 
                   nameKey="label" 
-                  outerRadius="80%"
+                  outerRadius={windowWidth < 768 ? "70%" : "80%"}
+                  label={({ name, percent }) => 
+                    windowWidth < 768 && percent < 0.05 
+                      ? null
+                      : `${name}: ${(percent * 100).toFixed(0)}%`
+                  }
+                  labelLine={windowWidth < 768 ? false : true}
                 >
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />

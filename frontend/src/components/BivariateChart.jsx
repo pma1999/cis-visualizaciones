@@ -45,7 +45,26 @@ export default function BivariateChart({
   const [exporting, setExporting] = useState(false);
   const [variable1Title, setVariable1Title] = useState('');
   const [variable2Title, setVariable2Title] = useState('');
+  const [viewMode, setViewMode] = useState('absolute'); // 'absolute' o 'relative'
   const chartContainerRef = useRef(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize);
+      handleResize();
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleResize);
+      }
+    };
+  }, []);
 
   // Efecto para cargar los datos iniciales
   useEffect(() => {
@@ -157,6 +176,15 @@ export default function BivariateChart({
     }
   };
 
+  // Obtener explicación del modo relativo según el tipo de gráfico
+  const getRelativeModeExplanation = () => {
+    if (chartType === 'treemap') {
+      return 'Porcentajes del total';
+    } else { // stacked
+      return 'Porcentajes por fila';
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-4 border rounded-md bg-white shadow">
@@ -181,18 +209,42 @@ export default function BivariateChart({
       .flatMap(([key, row]) => 
         Object.entries(row.valores)
           .filter(([colKey]) => colKey !== "All")
-          .map(([colKey, valor], index) => ({
-            name: contingencyData.datos.columnas[colKey].etiqueta,
-            secondaryLabel: contingencyData.datos.columnas[colKey].etiqueta,
-            secondaryVariable: contingencyData.metadatos.variable2.etiqueta,
-            mainValue: row.etiqueta,
-            mainKey: key,
-            colorIndex: index,
-            size: valor.frecuencia,
-            value: valor.frecuencia,
-            percentRow: valor.porcentaje_fila,
-            percentCol: valor.porcentaje_columna
-          }))
+          .map(([colKey, valor], index) => {
+            // Para treemap, usamos porcentaje del total en modo relativo
+            // porque representa mejor la proporción visual de los cuadros
+            const totalValue = contingencyData.datos.filas["All"]?.valores["All"]?.frecuencia || 0;
+            const percentTotal = totalValue > 0 ? (valor.frecuencia / totalValue) * 100 : 0;
+            
+            // Determine the value to display based on viewMode
+            let displayValue;
+            let sizeValue;
+            
+            if (viewMode === 'relative') {
+              displayValue = percentTotal;
+              sizeValue = percentTotal;
+            } else { // 'absolute'
+              displayValue = valor.frecuencia;
+              sizeValue = valor.frecuencia;
+            }
+            
+            return {
+              name: contingencyData.datos.columnas[colKey].etiqueta,
+              secondaryLabel: contingencyData.datos.columnas[colKey].etiqueta,
+              secondaryVariable: contingencyData.metadatos.variable2.etiqueta,
+              mainVariable: contingencyData.metadatos.variable1.etiqueta,
+              mainValue: row.etiqueta,
+              mainKey: key,
+              colorIndex: index,
+              size: sizeValue,
+              value: displayValue,
+              displayValue: displayValue,
+              viewMode: viewMode,
+              frecuencia: valor.frecuencia,
+              percentRow: valor.porcentaje_fila,
+              percentCol: valor.porcentaje_columna,
+              percentTotal: percentTotal
+            };
+          })
       );
   };
 
@@ -206,7 +258,20 @@ export default function BivariateChart({
         Object.entries(row.valores)
           .filter(([colKey]) => colKey !== "All")
           .forEach(([colKey, valor]) => {
-            barData[contingencyData.datos.columnas[colKey].etiqueta] = valor.frecuencia;
+            // Para gráfico de barras, usamos porcentaje por fila en modo relativo
+            // ya que cada barra representa una categoría de la primera variable
+            let value;
+            if (viewMode === 'relative') {
+              value = valor.porcentaje_fila;
+            } else { // 'absolute'
+              value = valor.frecuencia;
+            }
+            
+            barData[contingencyData.datos.columnas[colKey].etiqueta] = value;
+            // Store original values for tooltip
+            barData[`${contingencyData.datos.columnas[colKey].etiqueta}_freq`] = valor.frecuencia;
+            barData[`${contingencyData.datos.columnas[colKey].etiqueta}_row`] = valor.porcentaje_fila;
+            barData[`${contingencyData.datos.columnas[colKey].etiqueta}_col`] = valor.porcentaje_columna;
           });
         return barData;
       });
@@ -228,7 +293,19 @@ export default function BivariateChart({
             <p className="font-bold">{data.secondaryLabel || data.name}</p>
           </div>
           <div className="space-y-1">
-            <p><span className="font-medium">Frecuencia:</span> {data.value}</p>
+            <p>
+              <span className="font-medium">
+                {viewMode === 'absolute' 
+                  ? 'Frecuencia:' 
+                  : 'Porcentaje del total:'}
+              </span> 
+              {viewMode === 'absolute' 
+                ? data.frecuencia 
+                : `${data.percentTotal?.toFixed(2)}%`}
+            </p>
+            {viewMode === 'relative' && 
+              <p><span className="font-medium">Frecuencia:</span> {data.frecuencia}</p>
+            }
             <p><span className="font-medium">% Fila:</span> {data.percentRow?.toFixed(2)}%</p>
             <p><span className="font-medium">% Columna:</span> {data.percentCol?.toFixed(2)}%</p>
           </div>
@@ -237,24 +314,64 @@ export default function BivariateChart({
     }
 
     return (
-      <div className="bg-white p-2 border rounded shadow">
-        <p className="font-medium">{payload[0].payload.name}</p>
-        {payload.map((entry, index) => (
-          <p key={index} style={{ color: entry.color }}>
-            {entry.name}: {entry.value}
-          </p>
-        ))}
+      <div className="bg-white p-3 border rounded shadow">
+        <p className="font-medium border-b pb-1 mb-2">{payload[0].payload.name}</p>
+        {payload.map((entry, index) => {
+          if (entry.dataKey.includes('_')) return null; // Skip the metadata fields
+          const baseKey = entry.dataKey;
+          const freqKey = `${baseKey}_freq`;
+          const rowKey = `${baseKey}_row`;
+          const colKey = `${baseKey}_col`;
+          
+          const freqValue = payload[0].payload[freqKey];
+          const rowValue = payload[0].payload[rowKey];
+          const colValue = payload[0].payload[colKey];
+          
+          return (
+            <div key={index} className="mb-2 pb-1 border-b last:border-0">
+              <p style={{ color: entry.color, fontWeight: 'bold' }}>{entry.name}</p>
+              <div className="pl-2">
+                <p>
+                  <span className="font-medium">
+                    {viewMode === 'absolute' 
+                      ? 'Frecuencia:' 
+                      : 'Porcentaje por fila:'}
+                  </span> 
+                  {viewMode === 'absolute' 
+                    ? freqValue 
+                    : `${rowValue?.toFixed(2)}%`}
+                </p>
+                {viewMode === 'relative' && 
+                  <p><span className="font-medium">Frecuencia:</span> {freqValue}</p>
+                }
+                {viewMode === 'absolute' &&
+                  <p><span className="font-medium">% Fila:</span> {rowValue?.toFixed(2)}%</p>
+                }
+                <p><span className="font-medium">% Columna:</span> {colValue?.toFixed(2)}%</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
 
-  const CustomizedContent = ({ x, y, width, height, name, mainValue, mainKey, colorIndex }) => {
+  const CustomizedContent = ({ x, y, width, height, name, mainValue, mainKey, colorIndex, displayValue, viewMode }) => {
     const minWidthForLabel = 70;
     const minHeightForLabel = 40;
     const shouldShowLabel = width > minWidthForLabel && height > minHeightForLabel;
 
     // Usar las variaciones de color para todos los rectángulos
     const color = colorScheme[mainKey]?.variations[colorIndex] || "#3182ce";
+
+    // Format the label based on viewMode
+    const getFormattedLabel = () => {
+      if (viewMode === 'absolute') {
+        return name;
+      } else {
+        return `${name} (${displayValue?.toFixed(1)}%)`;
+      }
+    };
 
     return (
       <g>
@@ -278,7 +395,7 @@ export default function BivariateChart({
               filter: 'drop-shadow(0px 0px 1px rgba(0,0,0,0.5))'
             }}
           >
-            {name}
+            {getFormattedLabel()}
           </text>
         )}
       </g>
@@ -293,38 +410,51 @@ export default function BivariateChart({
 
   return (
     <div className="p-4 border rounded-md bg-white shadow">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
         <h3 className="text-lg font-semibold">
           {contingencyData.metadatos.variable1.etiqueta} vs {contingencyData.metadatos.variable2.etiqueta}
         </h3>
-        <button
-          onClick={handleExportChart}
-          disabled={exporting}
-          className={`
-            px-3 py-1.5 rounded-md text-sm font-medium
-            flex items-center gap-2
-            ${exporting ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}
-            transition-colors duration-200
-          `}
-          title="Exportar gráfico como imagen"
-        >
-          {exporting ? (
-            <>
-              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>Exportando...</span>
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              <span>Exportar</span>
-            </>
-          )}
-        </button>
+        <div className="flex flex-wrap gap-4">
+          <div>
+            <label className="font-medium mr-2">Mostrar valores:</label>
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              className="border p-2 rounded-md"
+            >
+              <option value="absolute">Absolutos</option>
+              <option value="relative">Relativos ({getRelativeModeExplanation()})</option>
+            </select>
+          </div>
+          <button
+            onClick={handleExportChart}
+            disabled={exporting}
+            className={`
+              px-3 py-1.5 rounded-md text-sm font-medium
+              flex items-center gap-2
+              ${exporting ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}
+              transition-colors duration-200
+            `}
+            title="Exportar gráfico como imagen"
+          >
+            {exporting ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Exportando...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>Exportar</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
       
       {totalExcluded > 0 && (
@@ -354,7 +484,7 @@ export default function BivariateChart({
         </div>
       )}
 
-      <div ref={chartContainerRef} className="h-[400px] bg-white">
+      <div ref={chartContainerRef} className="h-[480px] bg-white">
         {/* Título del gráfico para la exportación */}
         <div className="text-center py-3 border-b mb-2">
           <h2 className="text-xl font-bold text-gray-800">Análisis Bivariado</h2>
@@ -363,6 +493,7 @@ export default function BivariateChart({
           </p>
           <p className="text-sm text-gray-600 mt-1">
             Gráfico de {getChartTypeName()}
+            {viewMode === 'relative' && ` - Valores relativos (${getRelativeModeExplanation()})`}
           </p>
           {totalExcluded > 0 && (
             <p className="text-xs text-gray-500 mt-1">
@@ -386,19 +517,43 @@ export default function BivariateChart({
                 <Tooltip content={<CustomTooltip />} />
               </Treemap>
             ) : (
-              <BarChart data={prepareStackedBarData()}>
+              <BarChart 
+                data={prepareStackedBarData()}
+                margin={
+                  windowWidth < 768 
+                    ? { top: 20, right: 30, left: 0, bottom: 120 }
+                    : { top: 20, right: 30, left: 20, bottom: 70 }
+                }
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="name"
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: windowWidth < 768 ? 8 : 10 }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
-                  height={60}
+                  height={windowWidth < 768 ? 100 : 70}
                 />
-                <YAxis />
+                <YAxis 
+                  label={
+                    windowWidth < 768 
+                      ? null
+                      : (viewMode !== 'absolute' 
+                          ? { value: 'Porcentaje (%)', angle: -90, position: 'insideLeft', dy: -10 }
+                          : { value: 'Frecuencia', angle: -90, position: 'insideLeft', dy: -10 }
+                        )
+                  }
+                  tick={{ fontSize: windowWidth < 768 ? 9 : 10 }}
+                />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend 
+                  wrapperStyle={{ 
+                    paddingTop: 10, 
+                    fontSize: windowWidth < 768 ? 10 : 12,
+                    width: '100%',
+                    marginLeft: windowWidth < 768 ? -20 : 0 
+                  }} 
+                />
                 {Object.entries(contingencyData.datos.columnas)
                   .filter(([key]) => key !== "All")
                   .map(([key, col], index, array) => (
