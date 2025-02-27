@@ -8,7 +8,7 @@ import EditFileModal from './EditFileModal';
 import FileUploader from './FileUploader';
 import FilesList from './FilesList';
 
-export default function FileManager({ onFileChange }) {
+export default function FileManager({ onFileChange, darkMode = false }) {
   // Usar el contexto para el estado de archivos
   const { 
     files, 

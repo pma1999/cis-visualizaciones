@@ -126,7 +126,7 @@ export default function AnalysisPage() {
             {/* Acciones del header */}
             <div className="flex items-center space-x-1 sm:space-x-3">
               {/* Selector de archivos */}
-              <FileManager onFileChange={handleFileChange} />
+              <FileManager onFileChange={handleFileChange} darkMode={darkMode} />
               
               {/* Botón modo oscuro */}
               <button
