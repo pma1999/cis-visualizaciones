@@ -6,7 +6,7 @@
 
 Una aplicación web moderna para explorar, analizar y visualizar datos sociológicos del Centro de Investigaciones Sociológicas (CIS) de España.
 
-![Captura de pantalla de la aplicación](frontend\public\assets\screenshot.png)
+![Captura de pantalla de la aplicación](/frontend/public/assets/screenshot.png)
 
 ## 🔍 Demo en vivo
 
