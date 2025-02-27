@@ -150,7 +150,7 @@ const getDeviceSpecificSettings = () => {
     width: isMobile ? 800 : 1200,
     height: isMobile ? 700 : 900,
     legendPosition: isMobile ? 'bottom' : 'right',
-    chartHeight: isMobile ? 400 : 500,
+    chartHeight: isMobile ? 500 : 600,
     fontSize: {
       title: isMobile ? 16 : 20,
       subtitle: isMobile ? 14 : 16,
@@ -158,8 +158,8 @@ const getDeviceSpecificSettings = () => {
       legend: isMobile ? 10 : 12
     },
     margins: isMobile 
-      ? { top: 20, right: 20, bottom: 80, left: 40 }
-      : { top: 30, right: 30, bottom: 50, left: 50 }
+      ? { top: 10, right: 10, bottom: 60, left: 30 }
+      : { top: 20, right: 20, bottom: 40, left: 40 }
   };
 };
 
@@ -180,6 +180,12 @@ const optimizeSvgForExport = (svgElement, width, height) => {
   if (!svgElement.getAttribute('viewBox')) {
     svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
   }
+  
+  // Optimización adicional para aprovechar el espacio
+  svgElement.style.display = 'block';
+  svgElement.style.margin = '0 auto';
+  svgElement.style.maxWidth = '100%';
+  svgElement.style.maxHeight = '100%';
   
   // Optimizar textos y fuentes
   svgElement.setAttribute('font-family', 'Arial, sans-serif');
@@ -218,9 +224,9 @@ const prepareChartForExport = (originalChartElement, container, options) => {
   // Crear contenedor para el gráfico
   const chartContainer = document.createElement('div');
   chartContainer.style.width = '100%';
-  chartContainer.style.height = `${options.chartHeight || 400}px`;
+  chartContainer.style.height = `${options.chartHeight || 500}px`;
   chartContainer.style.position = 'relative';
-  chartContainer.style.margin = '20px 0';
+  chartContainer.style.margin = '10px 0';
   
   // Clonar el SVG original
   const originalSvg = originalChartElement.querySelector('svg');
@@ -228,7 +234,7 @@ const prepareChartForExport = (originalChartElement, container, options) => {
     const clonedSvg = originalSvg.cloneNode(true);
     
     // Optimizar el SVG para exportación
-    optimizeSvgForExport(clonedSvg, container.offsetWidth, options.chartHeight || 400);
+    optimizeSvgForExport(clonedSvg, container.offsetWidth, options.chartHeight || 500);
     
     // Agregar el SVG optimizado al contenedor
     chartContainer.appendChild(clonedSvg);
@@ -314,7 +320,7 @@ const exportUsingCanvas = async (container, filename, options = {}) => {
     
     // Configuración para html2canvas
     const canvasOptions = {
-      scale: 2, // Mayor escala para mejor calidad
+      scale: 3, // Aumentado de 2 a 3 para mejor calidad
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -398,12 +404,12 @@ const createCompleteChartElement = (originalElement, options) => {
   
   // 1. Agregar sección de título
   const titleSection = document.createElement('div');
-  titleSection.style.padding = '20px';
+  titleSection.style.padding = '15px 10px';
   titleSection.style.borderBottom = '1px solid #eaeaea';
   titleSection.style.textAlign = 'center';
   
   const title = document.createElement('h2');
-  title.style.margin = '0 0 10px 0';
+  title.style.margin = '0 0 5px 0';
   title.style.fontSize = '22px';
   title.style.fontWeight = 'bold';
   title.style.color = '#333';
@@ -413,7 +419,7 @@ const createCompleteChartElement = (originalElement, options) => {
   
   if (options.subtitle || chartInfo.subtitle) {
     const subtitle = document.createElement('p');
-    subtitle.style.margin = '0 0 5px 0';
+    subtitle.style.margin = '0 0 3px 0';
     subtitle.style.fontSize = '16px';
     subtitle.style.color = '#555';
     subtitle.textContent = options.subtitle || chartInfo.subtitle || '';
@@ -422,7 +428,7 @@ const createCompleteChartElement = (originalElement, options) => {
   
   if (options.description || chartInfo.description) {
     const description = document.createElement('p');
-    description.style.margin = '5px 0 0 0';
+    description.style.margin = '3px 0 0 0';
     description.style.fontSize = '14px';
     description.style.color = '#777';
     description.textContent = options.description || chartInfo.description || '';
@@ -434,12 +440,16 @@ const createCompleteChartElement = (originalElement, options) => {
   // 2. Agregar el gráfico (clonar el SVG o contenido equivalente)
   const chartSection = document.createElement('div');
   chartSection.style.padding = '0';
-  chartSection.style.height = `${options.chartHeight || 400}px`;
+  
+  // Aumentar la altura del gráfico
+  const isMobile = window.innerWidth < 768;
+  const chartHeight = options.chartHeight || (isMobile ? 500 : 600);
+  chartSection.style.height = `${chartHeight}px`;
   
   const svgElement = originalElement.querySelector('svg');
   if (svgElement) {
     const clonedSvg = svgElement.cloneNode(true);
-    optimizeSvgForExport(clonedSvg, options.width, options.chartHeight || 400);
+    optimizeSvgForExport(clonedSvg, options.width, chartHeight);
     chartSection.appendChild(clonedSvg);
   } else {
     // Si no hay SVG, intentar extraer el contenedor del gráfico
@@ -461,24 +471,24 @@ const createCompleteChartElement = (originalElement, options) => {
   const legendItems = options.legendItems || chartInfo.legendItems;
   if (legendItems && legendItems.length > 0) {
     const legendSection = document.createElement('div');
-    legendSection.style.padding = '15px';
+    legendSection.style.padding = '10px';
     legendSection.style.borderTop = '1px solid #eaeaea';
     legendSection.style.display = 'flex';
     legendSection.style.flexWrap = 'wrap';
     legendSection.style.justifyContent = 'center';
-    legendSection.style.gap = '15px';
+    legendSection.style.gap = '10px';
     
     legendItems.forEach(item => {
       const legendItem = document.createElement('div');
       legendItem.style.display = 'flex';
       legendItem.style.alignItems = 'center';
-      legendItem.style.marginRight = '15px';
+      legendItem.style.marginRight = '12px';
       
       const colorBox = document.createElement('div');
       colorBox.style.width = '15px';
       colorBox.style.height = '15px';
       colorBox.style.backgroundColor = item.color;
-      colorBox.style.marginRight = '8px';
+      colorBox.style.marginRight = '6px';
       colorBox.style.borderRadius = '3px';
       
       const label = document.createElement('span');
@@ -497,7 +507,7 @@ const createCompleteChartElement = (originalElement, options) => {
   // 4. Agregar nota al pie si existe
   if (options.footnote) {
     const footnoteSection = document.createElement('div');
-    footnoteSection.style.padding = '10px 15px';
+    footnoteSection.style.padding = '8px 10px';
     footnoteSection.style.borderTop = '1px solid #eaeaea';
     footnoteSection.style.fontSize = '12px';
     footnoteSection.style.color = '#666';
@@ -568,7 +578,7 @@ export const exportAsImage = async (originalChartElement, filename, userOptions 
     const exportSuccess = await exportUsingCanvas(completeChartElement, filename, {
       width: completeChartElement.offsetWidth,
       height: completeChartElement.scrollHeight,
-      scale: 2,
+      scale: 3, // Aumentado de 2 a 3 para mejor calidad
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',

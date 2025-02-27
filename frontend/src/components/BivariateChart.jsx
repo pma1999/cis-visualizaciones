@@ -547,7 +547,7 @@ export default function BivariateChart({
         </div>
       )}
 
-      <div ref={chartContainerRef} className="h-[480px] bg-white">
+      <div ref={chartContainerRef} className="h-[550px] bg-white">
         {/* Título del gráfico para la exportación */}
         <div className="text-center py-3 border-b mb-2">
           <h2 className="text-xl font-bold text-gray-800">Análisis Bivariado</h2>

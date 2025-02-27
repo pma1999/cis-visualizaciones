@@ -192,7 +192,7 @@ export default function ChartComponent({ variable, chartType, sortOrder, exclude
         </div>
       )}
       
-      <div ref={chartContainerRef} className="h-[350px] md:h-[450px] w-full bg-white">
+      <div ref={chartContainerRef} className="h-[400px] md:h-[550px] w-full bg-white">
         <div className="text-center py-3 border-b mb-2">
           <h2 className="text-xl font-bold text-gray-800">{variableTitle}</h2>
           <p className="text-sm text-gray-600">Gráfico de {getChartTypeName()}</p>
