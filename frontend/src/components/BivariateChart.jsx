@@ -30,6 +30,13 @@ export default function BivariateChart({
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [chartInstance, setChartInstance] = useState(null);
   const chartRef = useRef(null);
+  // State variables for chart display
+  const [aspectRatio, setAspectRatio] = useState(windowWidth < 640 ? 1.2 : 1.6);
+  const [showLegend, setShowLegend] = useState(true);
+  const [zoom, setZoom] = useState(100);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Add download format state
+  const [downloadFormat, setDownloadFormat] = useState('png');
 
   // Hooks personalizados
   const {
@@ -92,13 +99,22 @@ export default function BivariateChart({
     variable1, 
     variable2, 
     excludedValues1, 
-    excludedValues2
+    excludedValues2,
+    aspectRatio,
+    zoom,
+    showLegend
   ]);
 
-  // Add zoom controls
-  const [zoom, setZoom] = useState(100);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Adjust chart options based on zoom
+  useEffect(() => {
+    if (chartInstance && zoom !== 100) {
+      // Use the current aspectRatio state instead of recalculating
+      chartInstance.options.aspectRatio = aspectRatio * (100 / zoom);
+      chartInstance.update();
+    }
+  }, [zoom, chartInstance, aspectRatio]);
   
+  // Add zoom controls
   const increaseZoom = () => {
     setZoom(prevZoom => Math.min(prevZoom + 20, 200));
   };
@@ -109,6 +125,30 @@ export default function BivariateChart({
   
   const resetZoom = () => {
     setZoom(100);
+  };
+  
+  // Add aspect ratio toggle function
+  const toggleAspectRatio = () => {
+    // Toggle between wide and square aspect ratio
+    const newRatio = aspectRatio === (windowWidth < 640 ? 1.2 : 1.6) ? 1 : (windowWidth < 640 ? 1.2 : 1.6);
+    setAspectRatio(newRatio);
+    
+    // Update chart if it exists
+    if (chartInstance) {
+      chartInstance.options.aspectRatio = newRatio * (100 / zoom);
+      chartInstance.update();
+    }
+  };
+  
+  // Add legend toggle function
+  const toggleLegend = () => {
+    setShowLegend(!showLegend);
+    
+    // Update chart if it exists
+    if (chartInstance) {
+      chartInstance.options.plugins.legend.display = !showLegend;
+      chartInstance.update();
+    }
   };
   
   // Toggle fullscreen mode
@@ -138,18 +178,6 @@ export default function BivariateChart({
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
-  
-  // Adjust chart options based on zoom
-  useEffect(() => {
-    if (chartInstance && zoom !== 100) {
-      // Calculate a better aspect ratio for mobile
-      const baseAspectRatio = windowWidth < 640 ? 1.2 : 1.6;
-      
-      // Adjust chart aspect ratio based on zoom
-      chartInstance.options.aspectRatio = baseAspectRatio * (100 / zoom);
-      chartInstance.update();
-    }
-  }, [zoom, chartInstance, windowWidth]);
 
   // Preparar los datos según el tipo de gráfico
   const getChartData = () => {
@@ -251,7 +279,7 @@ export default function BivariateChart({
       },
       options: {
         responsive: true,
-        aspectRatio: baseAspectRatio, // Changed to dynamic based on screen width
+        aspectRatio: aspectRatio * (100 / zoom), // Use aspectRatio state instead of hardcoded value
         maintainAspectRatio: !isFullscreenPage, // Don't maintain aspect ratio in fullscreen mode
         plugins: {
           tooltip: {
@@ -282,6 +310,7 @@ export default function BivariateChart({
           },
           legend: {
             position: 'bottom',
+            display: showLegend,
             labels: {
               boxWidth: 15,
               padding: windowWidth < 640 ? 8 : 15,
@@ -338,7 +367,8 @@ export default function BivariateChart({
       viewMode: localViewMode,
       darkMode,
       excludedValues1: excludedValues1.length,
-      excludedValues2: excludedValues2.length
+      excludedValues2: excludedValues2.length,
+      format: downloadFormat // Pass the selected format
     });
   };
 
@@ -351,7 +381,10 @@ export default function BivariateChart({
       viewMode: localViewMode,
       darkMode,
       excludedValues1,
-      excludedValues2
+      excludedValues2,
+      zoom: zoom,
+      aspectRatio: aspectRatio,
+      showLegend: showLegend
     });
   };
 
@@ -375,33 +408,39 @@ export default function BivariateChart({
   return (
     <div className={`${darkMode ? 'text-white' : 'text-gray-800'}`}>
       <div className={`relative ${isFullscreenPage ? 'h-full' : ''}`}>
-        <div className="flex flex-wrap items-center justify-between mb-3">
-          <h3 className={`text-lg font-semibold ${isFullscreenPage ? 'sr-only' : ''}`}>
-            {variable1Title && variable2Title ? (
-              <>Análisis bivariado (barras apiladas): {variable1Title} × {variable2Title}</>
-            ) : (
-              <>Análisis bivariado (barras apiladas)</>
-            )}
-          </h3>
-          
-          <ChartControls 
-            viewMode={localViewMode}
-            setViewMode={setLocalViewMode}
-            exporting={exporting}
-            handleExportChart={onExportChart}
-            openInNewTab={onOpenInNewTab}
-            isFullscreenPage={isFullscreenPage}
-            darkMode={darkMode}
-            zoom={zoom}
-            increaseZoom={increaseZoom}
-            decreaseZoom={decreaseZoom}
-            resetZoom={resetZoom}
-            toggleFullscreen={toggleFullscreen}
-            isFullscreen={isFullscreen}
-          />
-        </div>
+        {/* Only show title and controls in this layout when NOT in fullscreen page */}
+        {!isFullscreenPage && (
+          <div className="flex flex-wrap items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold">
+              {variable1Title && variable2Title ? (
+                <>Análisis bivariado (barras apiladas): {variable1Title} × {variable2Title}</>
+              ) : (
+                <>Análisis bivariado (barras apiladas)</>
+              )}
+            </h3>
+            
+            <ChartControls 
+              viewMode={localViewMode}
+              setViewMode={setLocalViewMode}
+              exporting={exporting}
+              handleExportChart={onExportChart}
+              openInNewTab={onOpenInNewTab}
+              isFullscreenPage={isFullscreenPage}
+              darkMode={darkMode}
+              zoom={zoom}
+              increaseZoom={increaseZoom}
+              decreaseZoom={decreaseZoom}
+              resetZoom={resetZoom}
+              showLegend={showLegend}
+              toggleLegend={toggleLegend}
+              toggleAspectRatio={toggleAspectRatio}
+              toggleFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+            />
+          </div>
+        )}
       
-        {totalExcluded > 0 && (
+        {totalExcluded > 0 && !isFullscreenPage && (
           <div className={`text-xs mb-2 px-2 py-1 rounded-md inline-block ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
             {totalExcluded} {totalExcluded === 1 ? 'valor excluido' : 'valores excluidos'}
           </div>
@@ -409,7 +448,7 @@ export default function BivariateChart({
         
         <div 
           ref={chartContainerRef}
-          className={`overflow-hidden rounded-lg ${
+          className={`relative overflow-hidden rounded-lg ${
             isFullscreen 
               ? 'bg-black w-screen h-screen flex items-center justify-center' 
               : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-2 sm:p-4 ${isFullscreenPage ? 'h-full' : 'h-[350px] sm:h-[500px]'}`
@@ -418,6 +457,41 @@ export default function BivariateChart({
             minHeight: isFullscreenPage ? '100%' : undefined
           }}
         >
+          {/* Add absolute positioned controls similar to ChartComponent when in fullscreen page */}
+          {isFullscreenPage && (
+            <div className={`absolute top-0 right-0 z-10 flex items-center space-x-1 p-1 ${isFullscreen ? 'bg-black/20 rounded-bl-lg backdrop-blur-sm' : ''}`}>
+              <div className="transition-opacity duration-200">
+                <select
+                  className={`text-[10px] sm:text-xs p-0.5 sm:p-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
+                  value={downloadFormat}
+                  onChange={(e) => setDownloadFormat(e.target.value)}
+                >
+                  <option value="png">PNG</option>
+                  <option value="jpg">JPG</option>
+                </select>
+              </div>
+              
+              <ChartControls 
+                viewMode={localViewMode}
+                setViewMode={setLocalViewMode}
+                exporting={exporting}
+                handleExportChart={onExportChart}
+                openInNewTab={onOpenInNewTab}
+                isFullscreenPage={isFullscreenPage}
+                darkMode={darkMode}
+                zoom={zoom}
+                increaseZoom={increaseZoom}
+                decreaseZoom={decreaseZoom}
+                resetZoom={resetZoom}
+                showLegend={showLegend}
+                toggleLegend={toggleLegend}
+                toggleAspectRatio={toggleAspectRatio}
+                toggleFullscreen={toggleFullscreen}
+                isFullscreen={isFullscreen}
+              />
+            </div>
+          )}
+          
           <canvas 
             ref={chartRef}
             className="w-full h-full"

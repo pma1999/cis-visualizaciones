@@ -112,45 +112,77 @@ const useChartExport = () => {
    * @param {string} chartInfo.file - Nombre del archivo específico para usar (opcional)
    * @param {boolean} chartInfo.isLocalFile - Si el archivo es local (opcional)
    */
-  const openInNewTab = ({ 
-    variable1, 
-    variable2, 
-    chartType = 'stacked', 
-    viewMode = 'absolute', 
-    darkMode = false, 
-    excludedValues1 = [], 
-    excludedValues2 = [],
-    file = null,
-    isLocalFile = null
-  }) => {
-    const baseUrl = window.location.origin;
-    const excludedValues1Param = excludedValues1.length > 0 ? `&excludedValues1=${excludedValues1.join(',')}` : '';
-    const excludedValues2Param = excludedValues2.length > 0 ? `&excludedValues2=${excludedValues2.join(',')}` : '';
+  const openInNewTab = (options) => {
+    // Base URL for the fullscreen page
+    let baseUrl = '/fullscreen';
+    
+    // Determine if it's a univariate or bivariate chart
+    if (options.variable1 && options.variable2) {
+      // Bivariate chart
+      baseUrl += `/bivariate/${options.variable1}/${options.variable2}`;
+    } else if (options.variable1) {
+      // Univariate chart
+      baseUrl += `/chart/${options.variable1}`;
+    } else {
+      console.error("No variables provided for opening in new tab");
+      return;
+    }
+    
+    // Prepare URL params
+    const params = new URLSearchParams();
+    
+    // Add chart type
+    if (options.chartType) {
+      params.append('chartType', options.chartType);
+    }
+    
+    // Add sort order for univariate charts
+    if (options.sortOrder) {
+      params.append('sortOrder', options.sortOrder);
+    }
+    
+    // Add view mode for bivariate charts
+    if (options.viewMode) {
+      params.append('viewMode', options.viewMode);
+    }
+    
+    // Add excluded values
+    if (options.excludedValues1 && options.excludedValues1.length > 0) {
+      params.append('excludedValues1', options.excludedValues1.join(','));
+    }
+    
+    if (options.excludedValues2 && options.excludedValues2.length > 0) {
+      params.append('excludedValues2', options.excludedValues2.join(','));
+    }
+    
+    // Add dark mode
+    if (options.darkMode) {
+      params.append('darkMode', options.darkMode);
+    }
+    
+    // Add zoom level
+    if (options.zoom) {
+      params.append('zoom', options.zoom);
+    }
+    
+    // Add aspect ratio
+    if (options.aspectRatio) {
+      params.append('aspectRatio', options.aspectRatio);
+    }
+    
+    // Add show legend
+    if (options.showLegend !== undefined) {
+      params.append('showLegend', options.showLegend);
+    }
     
     // Include file information in the URL
-    let fileParam = '';
-    let fileTypeParam = '';
-    
-    // Use provided file info or active file info
-    if (file) {
-      fileParam = `&file=${encodeURIComponent(file)}`;
-      fileTypeParam = `&fileType=${isLocalFile ? 'local' : 'shared'}`;
-    } else if (activeFile && activeFile.filename) {
-      fileParam = `&file=${encodeURIComponent(activeFile.filename)}`;
-      fileTypeParam = `&fileType=${activeFile.isLocal ? 'local' : 'shared'}`;
+    if (activeFile) {
+      params.append('file', activeFile.filename);
+      params.append('fileType', activeFile.isLocal ? 'local' : 'shared');
     }
     
-    // Create URL based on chart type (univariate or bivariate)
-    let url;
-    if (variable2) {
-      // Bivariate chart
-      url = `${baseUrl}/chart/bivariate/${variable1}/${variable2}?chartType=${chartType}${excludedValues1Param}${excludedValues2Param}&darkMode=${darkMode}&viewMode=${viewMode}${fileParam}${fileTypeParam}`;
-    } else {
-      // Univariate chart
-      url = `${baseUrl}/chart/univariate/${variable1}?chartType=${chartType}${excludedValues1Param}&darkMode=${darkMode}${fileParam}${fileTypeParam}`;
-    }
-    
-    window.open(url, '_blank');
+    // Open new tab with constructed URL
+    window.open(`${baseUrl}?${params.toString()}`, '_blank');
   };
 
   return {

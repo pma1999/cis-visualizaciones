@@ -15,6 +15,9 @@ import React from 'react';
  * @param {Function} props.increaseZoom - Función para aumentar el zoom
  * @param {Function} props.decreaseZoom - Función para disminuir el zoom
  * @param {Function} props.resetZoom - Función para resetear el zoom
+ * @param {boolean} props.showLegend - Si se muestra la leyenda
+ * @param {Function} props.toggleLegend - Función para mostrar/ocultar la leyenda
+ * @param {Function} props.toggleAspectRatio - Función para cambiar la relación de aspecto
  * @param {Function} props.toggleFullscreen - Función para alternar pantalla completa
  * @param {boolean} props.isFullscreen - Si el gráfico está en pantalla completa
  */
@@ -30,6 +33,9 @@ const ChartControls = ({
   increaseZoom,
   decreaseZoom,
   resetZoom,
+  showLegend,
+  toggleLegend,
+  toggleAspectRatio,
   toggleFullscreen,
   isFullscreen = false
 }) => {
@@ -117,6 +123,30 @@ const ChartControls = ({
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+        )}
+        
+        {toggleLegend && (
+          <button
+            onClick={toggleLegend}
+            className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
+            title={showLegend ? "Ocultar leyenda" : "Mostrar leyenda"}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </button>
+        )}
+        
+        {toggleAspectRatio && (
+          <button
+            onClick={toggleAspectRatio}
+            className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
+            title="Cambiar relación de aspecto"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 4h-4m0 0v4m0-4L7 14M5 20h4m0 0v-4m0 4L17 10" />
             </svg>
           </button>
         )}
