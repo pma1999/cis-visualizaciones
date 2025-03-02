@@ -445,38 +445,17 @@ export default function BivariateChart({
   return (
     <div className={`${darkMode ? 'text-white' : 'text-gray-800'}`}>
       <div className={`relative ${isFullscreenPage ? 'h-full' : ''}`}>
-        {/* Only show title and controls in this layout when NOT in fullscreen page */}
+        {/* Only show title when NOT in fullscreen page */}
         {!isFullscreenPage && (
-          <div className="flex flex-wrap items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold">
-              {variable1Title && variable2Title ? (
-                <>Análisis bivariado (barras apiladas): {variable1Title} × {variable2Title}</>
-              ) : (
-                <>Análisis bivariado (barras apiladas)</>
-              )}
-            </h3>
-            
-            <ChartControls 
-              viewMode={localViewMode}
-              setViewMode={setLocalViewMode}
-              exporting={exporting}
-              handleExportChart={onExportChart}
-              openInNewTab={onOpenInNewTab}
-              isFullscreenPage={isFullscreenPage}
-              darkMode={darkMode}
-              zoom={zoom}
-              increaseZoom={increaseZoom}
-              decreaseZoom={decreaseZoom}
-              resetZoom={resetZoom}
-              showLegend={showLegend}
-              toggleLegend={toggleLegend}
-              toggleAspectRatio={toggleAspectRatio}
-              toggleFullscreen={toggleFullscreen}
-              isFullscreen={isFullscreen}
-            />
-          </div>
+          <h3 className="text-lg font-semibold mb-3">
+            {variable1Title && variable2Title ? (
+              <>Análisis bivariado (barras apiladas): {variable1Title} × {variable2Title}</>
+            ) : (
+              <>Análisis bivariado (barras apiladas)</>
+            )}
+          </h3>
         )}
-      
+        
         {totalExcluded > 0 && !isFullscreenPage && (
           <div className={`text-xs mb-2 px-2 py-1 rounded-md inline-block ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
             {totalExcluded} {totalExcluded === 1 ? 'valor excluido' : 'valores excluidos'}
@@ -494,14 +473,33 @@ export default function BivariateChart({
             minHeight: isFullscreenPage ? '100%' : undefined
           }}
         >
-          {/* Add absolute positioned controls similar to ChartComponent when in fullscreen page */}
-          {isFullscreenPage && (
-            <div className={`absolute top-0 right-0 z-10 flex items-center space-x-1 p-1 ${isFullscreen ? 'bg-black/20 rounded-bl-lg backdrop-blur-sm' : ''}`}>
-              <div className="transition-opacity duration-200">
+          {/* Controls container with absolute positioning - shown in all cases */}
+          <div className={`absolute top-0 left-0 right-0 z-10 px-2 py-2 sm:py-1.5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 border-b ${
+            isFullscreen || darkMode 
+              ? 'bg-black/30 backdrop-blur-sm border-gray-700/30' 
+              : 'bg-white/60 backdrop-blur-sm border-gray-200/50'
+          }`}>
+            {/* Left side: View mode selector */}
+            <div className="flex-shrink-0 w-full sm:w-auto mb-1 sm:mb-0">
+              <select
+                className={`text-xs p-1 rounded border w-full sm:w-auto min-w-[120px] ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
+                value={localViewMode}
+                onChange={(e) => setLocalViewMode(e.target.value)}
+                aria-label="Modo de visualización"
+              >
+                <option value="absolute">Valores absolutos</option>
+                <option value="relative">Valores relativos (%)</option>
+              </select>
+            </div>
+            
+            {/* Right side: Chart controls */}
+            <div className="flex items-center gap-1">
+              <div className={`${windowWidth < 640 ? 'hidden sm:block' : ''}`}>
                 <select
                   className={`text-[10px] sm:text-xs p-0.5 sm:p-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
                   value={downloadFormat}
                   onChange={(e) => setDownloadFormat(e.target.value)}
+                  aria-label="Formato de descarga"
                 >
                   <option value="png">PNG</option>
                   <option value="jpg">JPG</option>
@@ -525,13 +523,20 @@ export default function BivariateChart({
                 toggleAspectRatio={toggleAspectRatio}
                 toggleFullscreen={toggleFullscreen}
                 isFullscreen={isFullscreen}
+                hideViewModeSelector={true}
               />
+            </div>
+          </div>
+          
+          {zoom !== 100 && (
+            <div className={`absolute bottom-0 left-0 m-2 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+              {zoom}%
             </div>
           )}
           
           <canvas 
             ref={chartRef}
-            className="w-full h-full"
+            className="w-full h-full mt-14 sm:mt-9" /* More margin on mobile, less on larger screens */
             style={{ 
               maxHeight: isFullscreen ? '95vh' : isFullscreenPage ? '100%' : undefined,
               maxWidth: isFullscreen ? '95vw' : '100%'

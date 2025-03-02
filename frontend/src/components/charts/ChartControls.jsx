@@ -20,6 +20,7 @@ import React from 'react';
  * @param {Function} props.toggleAspectRatio - Función para cambiar la relación de aspecto
  * @param {Function} props.toggleFullscreen - Función para alternar pantalla completa
  * @param {boolean} props.isFullscreen - Si el gráfico está en pantalla completa
+ * @param {boolean} props.hideViewModeSelector - Si se debe ocultar el selector de modo de visualización
  */
 const ChartControls = ({ 
   viewMode, 
@@ -37,11 +38,12 @@ const ChartControls = ({
   toggleLegend,
   toggleAspectRatio,
   toggleFullscreen,
-  isFullscreen = false
+  isFullscreen = false,
+  hideViewModeSelector = false
 }) => {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {!isFullscreenPage && (
+      {!isFullscreenPage && !hideViewModeSelector && (
         <select
           className={`text-xs p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
           value={viewMode}
