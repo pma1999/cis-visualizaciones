@@ -181,154 +181,58 @@ export default function ContingencyTable({
     }
   };
 
-  const prepareTableForExport = () => {
-    // Función para preparar la tabla antes de la exportación
-    // Asegurarse de que no haya colores OKLCH que puedan causar problemas
-    if (!tableContainerRef.current) return;
-    
-    // Temporalmente reemplazar colores OKLCH con colores RGB
-    const elementsWithProblematicColors = tableContainerRef.current.querySelectorAll('*');
-    elementsWithProblematicColors.forEach(el => {
-      const computedStyle = window.getComputedStyle(el);
-      
-      // Guardar los estilos originales para restaurarlos después
-      el.dataset.originalBgColor = el.style.backgroundColor || '';
-      el.dataset.originalColor = el.style.color || '';
-      el.dataset.originalFill = el.style.fill || '';
-      el.dataset.originalStroke = el.style.stroke || '';
-      
-      // Aplicar colores compatibles con html2canvas
-      if (darkMode) {
-        // Versión oscura (con colores compatibles)
-        // Comprobamos varios formatos de color problemáticos: oklch, oklab, hsl con espacio, etc.
-        const problematicColorFormats = ['oklch', 'oklab', 'lch', 'lab', 'hsl('];
-        
-        const needsBackgroundReplacement = problematicColorFormats.some(format => 
-          computedStyle.backgroundColor && computedStyle.backgroundColor.includes(format)
-        );
-        
-        const needsTextColorReplacement = problematicColorFormats.some(format => 
-          computedStyle.color && computedStyle.color.includes(format)
-        );
-        
-        const needsFillReplacement = problematicColorFormats.some(format => 
-          computedStyle.fill && computedStyle.fill !== 'none' && computedStyle.fill.includes(format)
-        );
-        
-        const needsStrokeReplacement = problematicColorFormats.some(format => 
-          computedStyle.stroke && computedStyle.stroke !== 'none' && computedStyle.stroke.includes(format)
-        );
-        
-        if (needsBackgroundReplacement) {
-          el.style.backgroundColor = '#1e293b'; // Un azul oscuro compatible
-        }
-        
-        if (needsTextColorReplacement) {
-          el.style.color = '#e2e8f0'; // Un gris claro compatible
-        }
-        
-        if (needsFillReplacement) {
-          el.style.fill = '#4b5563'; // Un gris medio compatible
-        }
-        
-        if (needsStrokeReplacement) {
-          el.style.stroke = '#6b7280'; // Un gris para bordes compatible
-        }
-      } else {
-        // Versión clara (con colores compatibles)
-        const problematicColorFormats = ['oklch', 'oklab', 'lch', 'lab', 'hsl('];
-        
-        const needsBackgroundReplacement = problematicColorFormats.some(format => 
-          computedStyle.backgroundColor && computedStyle.backgroundColor.includes(format)
-        );
-        
-        const needsTextColorReplacement = problematicColorFormats.some(format => 
-          computedStyle.color && computedStyle.color.includes(format)
-        );
-        
-        const needsFillReplacement = problematicColorFormats.some(format => 
-          computedStyle.fill && computedStyle.fill !== 'none' && computedStyle.fill.includes(format)
-        );
-        
-        const needsStrokeReplacement = problematicColorFormats.some(format => 
-          computedStyle.stroke && computedStyle.stroke !== 'none' && computedStyle.stroke.includes(format)
-        );
-        
-        if (needsBackgroundReplacement) {
-          el.style.backgroundColor = '#f8fafc'; // Un gris muy claro compatible
-        }
-        
-        if (needsTextColorReplacement) {
-          el.style.color = '#0f172a'; // Un gris oscuro compatible
-        }
-        
-        if (needsFillReplacement) {
-          el.style.fill = '#334155'; // Un gris para rellenos compatible
-        }
-        
-        if (needsStrokeReplacement) {
-          el.style.stroke = '#64748b'; // Un gris para bordes compatible
-        }
-      }
-    });
-    
-    return () => {
-      // Restaurar los estilos originales
-      elementsWithProblematicColors.forEach(el => {
-        if (el.dataset.originalBgColor) {
-          el.style.backgroundColor = el.dataset.originalBgColor;
-          delete el.dataset.originalBgColor;
-        }
-        if (el.dataset.originalColor) {
-          el.style.color = el.dataset.originalColor;
-          delete el.dataset.originalColor;
-        }
-        if (el.dataset.originalFill) {
-          el.style.fill = el.dataset.originalFill;
-          delete el.dataset.originalFill;
-        }
-        if (el.dataset.originalStroke) {
-          el.style.stroke = el.dataset.originalStroke;
-          delete el.dataset.originalStroke;
-        }
-      });
-    };
-  };
-
   const exportAsTableImage = async () => {
     if (!tableContainerRef.current || !contingencyData) return;
     if (exportingCSV || exportingImage) return; // Evitar exportaciones múltiples
     
     setExportingImage(true);
     
-    // Preparar la tabla para la exportación y obtener función para restaurar
-    const restoreStyles = prepareTableForExport();
-    
     try {
+      // Obtener nombres de variables con etiquetas
+      const var1Label = contingencyData.metadatos.variable1.etiqueta || variable1;
+      const var2Label = contingencyData.metadatos.variable2.etiqueta || variable2;
+      
+      // Construir estadísticas para subtítulo
+      let statsInfo = '';
+      if (totalObservations > 0) {
+        statsInfo = `N=${totalObservations} observaciones`;
+        if (contingencyData.metadatos.observaciones_validas) {
+          statsInfo += `, ${contingencyData.metadatos.observaciones_validas} válidas`;
+        }
+      }
+      
+      // Modo de visualización para el subtítulo
+      const modoVisualizacion = viewMode === 'absolute' ? 'Valores absolutos' : 
+                               viewMode === 'row' ? 'Porcentajes por fila' : 
+                               'Porcentajes por columna';
+      
       // Preparar opciones para la exportación
       const options = {
-        title: `Tabla de contingencia: ${contingencyData.metadatos.variable1.etiqueta} × ${contingencyData.metadatos.variable2.etiqueta}`,
-        subtitle: `Modo de visualización: ${
-          viewMode === 'absolute' ? 'Valores absolutos' : 
-          viewMode === 'row' ? 'Porcentajes por fila' : 'Porcentajes por columna'
-        }`,
-        description: excludedValues1.length || excludedValues2.length ? 
-          `Se han excluido ${excludedValues1.length} valores de ${contingencyData.metadatos.variable1.etiqueta} y ${excludedValues2.length} valores de ${contingencyData.metadatos.variable2.etiqueta}` : 
+        // Título principal con las etiquetas de las variables
+        title: `Tabla de contingencia: ${var1Label} × ${var2Label}`,
+        
+        // Subtítulo con estadísticas y modo de visualización
+        subtitle: `${statsInfo}\nModo de visualización: ${modoVisualizacion}`,
+        
+        // Nota al pie sobre valores excluidos
+        footnote: (excludedValues1.length > 0 || excludedValues2.length > 0) ? 
+          `Nota: Se han excluido ${excludedValues1.length} valores de ${var1Label} y ${excludedValues2.length} valores de ${var2Label}.` : 
           "",
+          
         darkMode: darkMode,
         chartType: 'table',
-        width: tableContainerRef.current.offsetWidth * 1.5,
-        height: tableContainerRef.current.offsetHeight * 1.5,
-        skipCssColors: true, // Indicar que ignoramos los colores problemáticos
-        // Mejoras para garantizar una exportación perfecta
-        scale: 2, // Aumentar escala para mejor calidad
+        
+        // Mejorar la calidad de la exportación
+        scale: 2,
+        
+        // Configuración para html2canvas
         canvasOptions: {
-          logging: false, // Reducir ruido en consola
-          allowTaint: true, // Permitir contenido externo
-          useCORS: true, // Importante para imágenes externas
+          logging: false,
+          allowTaint: true,
+          useCORS: true,
           backgroundColor: darkMode ? '#0f172a' : '#ffffff',
-          windowWidth: window.innerWidth, // Asegurar que se capture todo el ancho
-          windowHeight: window.innerHeight // Asegurar altura correcta
+          windowWidth: window.innerWidth,
+          windowHeight: window.innerHeight
         }
       };
       
@@ -348,8 +252,6 @@ export default function ContingencyTable({
       console.error("Error al exportar como imagen:", error);
       alert('Error al exportar la tabla como imagen. Por favor, inténtelo de nuevo.');
     } finally {
-      // Restaurar los estilos originales
-      if (restoreStyles) restoreStyles();
       setExportingImage(false);
     }
   };

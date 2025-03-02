@@ -214,120 +214,6 @@ export default function FrequencyTable({ variable, sortOrder = 'code', excludedV
   // Verificar si tenemos alguna etiqueta para los valores
   const hasLabels = Object.keys(valueLabels).length > 0;
 
-  const prepareTableForExport = () => {
-    // Función para preparar la tabla antes de la exportación
-    // Asegurarse de que no haya colores OKLCH que puedan causar problemas
-    if (!tableContainerRef.current) return;
-    
-    // Temporalmente reemplazar colores OKLCH con colores RGB
-    const elementsWithProblematicColors = tableContainerRef.current.querySelectorAll('*');
-    elementsWithProblematicColors.forEach(el => {
-      const computedStyle = window.getComputedStyle(el);
-      
-      // Guardar los estilos originales para restaurarlos después
-      el.dataset.originalBgColor = el.style.backgroundColor || '';
-      el.dataset.originalColor = el.style.color || '';
-      el.dataset.originalFill = el.style.fill || '';
-      el.dataset.originalStroke = el.style.stroke || '';
-      
-      // Aplicar colores compatibles con html2canvas
-      if (darkMode) {
-        // Versión oscura (con colores compatibles)
-        // Comprobamos varios formatos de color problemáticos: oklch, oklab, hsl con espacio, etc.
-        const problematicColorFormats = ['oklch', 'oklab', 'lch', 'lab', 'hsl('];
-        
-        const needsBackgroundReplacement = problematicColorFormats.some(format => 
-          computedStyle.backgroundColor && computedStyle.backgroundColor.includes(format)
-        );
-        
-        const needsTextColorReplacement = problematicColorFormats.some(format => 
-          computedStyle.color && computedStyle.color.includes(format)
-        );
-        
-        const needsFillReplacement = problematicColorFormats.some(format => 
-          computedStyle.fill && computedStyle.fill !== 'none' && computedStyle.fill.includes(format)
-        );
-        
-        const needsStrokeReplacement = problematicColorFormats.some(format => 
-          computedStyle.stroke && computedStyle.stroke !== 'none' && computedStyle.stroke.includes(format)
-        );
-        
-        if (needsBackgroundReplacement) {
-          el.style.backgroundColor = '#1e293b'; // Un azul oscuro compatible
-        }
-        
-        if (needsTextColorReplacement) {
-          el.style.color = '#e2e8f0'; // Un gris claro compatible
-        }
-        
-        if (needsFillReplacement) {
-          el.style.fill = '#4b5563'; // Un gris medio compatible
-        }
-        
-        if (needsStrokeReplacement) {
-          el.style.stroke = '#6b7280'; // Un gris para bordes compatible
-        }
-      } else {
-        // Versión clara (con colores compatibles)
-        const problematicColorFormats = ['oklch', 'oklab', 'lch', 'lab', 'hsl('];
-        
-        const needsBackgroundReplacement = problematicColorFormats.some(format => 
-          computedStyle.backgroundColor && computedStyle.backgroundColor.includes(format)
-        );
-        
-        const needsTextColorReplacement = problematicColorFormats.some(format => 
-          computedStyle.color && computedStyle.color.includes(format)
-        );
-        
-        const needsFillReplacement = problematicColorFormats.some(format => 
-          computedStyle.fill && computedStyle.fill !== 'none' && computedStyle.fill.includes(format)
-        );
-        
-        const needsStrokeReplacement = problematicColorFormats.some(format => 
-          computedStyle.stroke && computedStyle.stroke !== 'none' && computedStyle.stroke.includes(format)
-        );
-        
-        if (needsBackgroundReplacement) {
-          el.style.backgroundColor = '#f8fafc'; // Un gris muy claro compatible
-        }
-        
-        if (needsTextColorReplacement) {
-          el.style.color = '#0f172a'; // Un gris oscuro compatible
-        }
-        
-        if (needsFillReplacement) {
-          el.style.fill = '#334155'; // Un gris para rellenos compatible
-        }
-        
-        if (needsStrokeReplacement) {
-          el.style.stroke = '#64748b'; // Un gris para bordes compatible
-        }
-      }
-    });
-    
-    return () => {
-      // Restaurar los estilos originales
-      elementsWithProblematicColors.forEach(el => {
-        if (el.dataset.originalBgColor) {
-          el.style.backgroundColor = el.dataset.originalBgColor;
-          delete el.dataset.originalBgColor;
-        }
-        if (el.dataset.originalColor) {
-          el.style.color = el.dataset.originalColor;
-          delete el.dataset.originalColor;
-        }
-        if (el.dataset.originalFill) {
-          el.style.fill = el.dataset.originalFill;
-          delete el.dataset.originalFill;
-        }
-        if (el.dataset.originalStroke) {
-          el.style.stroke = el.dataset.originalStroke;
-          delete el.dataset.originalStroke;
-        }
-      });
-    };
-  };
-
   const exportToCSV = () => {
     if (!data || Object.keys(data).length === 0) return;
     if (exportingCSV || exportingImage) return; // Evitar exportaciones múltiples
@@ -385,31 +271,50 @@ export default function FrequencyTable({ variable, sortOrder = 'code', excludedV
     
     setExportingImage(true);
     
-    // Preparar la tabla para la exportación y obtener función para restaurar
-    const restoreStyles = prepareTableForExport();
-    
     try {
+      // Preparar nombre de la variable con su etiqueta si está disponible
+      const variableLabel = metadata?.etiquetas_variables?.[variable] || variable;
+      
+      // Crear subtítulo con información estadística básica
+      let statsInfo = '';
+      if (stats.valid > 0) {
+        statsInfo = `N=${stats.valid} válidos`;
+        if (stats.missing > 0) {
+          statsInfo += `, ${stats.missing} perdidos`;
+        }
+        
+        if (stats.mean !== null && !isNaN(stats.mean)) {
+          statsInfo += `, Media=${stats.mean.toFixed(2)}`;
+        }
+      }
+      
       // Preparar opciones para la exportación
       const options = {
-        title: `Distribución de frecuencias: ${variable}`,
-        subtitle: `Ordenado por: ${sortOrder === 'code' ? 'código' : 'frecuencia'}`,
-        description: excludedValues.length > 0 ? 
-          `Se han excluido ${excludedValues.length} valores.` : 
+        // Título principal con la etiqueta de la variable
+        title: `Distribución de frecuencias: ${variableLabel}`,
+        
+        // Subtítulo con información de ordenación y estadísticas
+        subtitle: `${statsInfo}\nOrdenado por: ${sortOrder === 'code' ? 'código' : 'frecuencia'}`,
+        
+        // Usar la descripción como nota al pie
+        footnote: excludedValues.length > 0 ? 
+          `Nota: Se han excluido ${excludedValues.length} valores.` : 
           "",
+          
         darkMode: darkMode,
         chartType: 'table',
-        width: tableContainerRef.current.offsetWidth * 1.5,
-        height: tableContainerRef.current.offsetHeight * 1.5,
-        skipCssColors: true, // Indicar que ignoramos los colores problemáticos
-        // Mejoras para garantizar una exportación perfecta
-        scale: 2, // Aumentar escala para mejor calidad
+        
+        // Mejorar la calidad de la exportación
+        scale: 2,
+        
+        // Configuración para html2canvas
         canvasOptions: {
-          logging: false, // Reducir ruido en consola
-          allowTaint: true, // Permitir contenido externo
-          useCORS: true, // Importante para imágenes externas
+          logging: false,
+          allowTaint: true,
+          useCORS: true,
           backgroundColor: darkMode ? '#0f172a' : '#ffffff',
-          windowWidth: window.innerWidth, // Asegurar que se capture todo el ancho
-          windowHeight: window.innerHeight // Asegurar altura correcta
+          windowWidth: window.innerWidth,
+          windowHeight: window.innerHeight
         }
       };
       
@@ -429,8 +334,6 @@ export default function FrequencyTable({ variable, sortOrder = 'code', excludedV
       console.error("Error al exportar como imagen:", error);
       alert('Error al exportar la tabla como imagen. Por favor, inténtelo de nuevo.');
     } finally {
-      // Restaurar los estilos originales
-      if (restoreStyles) restoreStyles();
       setExportingImage(false);
     }
   };
