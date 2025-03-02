@@ -11,6 +11,7 @@ import {
 } from "../api/cisApi";
 
 export default function FullscreenChartPage() {
+  // Extract route parameters - Updated to match route paths in App.jsx
   const { type, variable1, variable2 } = useParams();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -21,7 +22,7 @@ export default function FullscreenChartPage() {
   const isLocalFileParam = fileTypeParam === "local";
   
   // Determine the actual chart type from the URL path
-  // If it contains 'bivariate' in the path, it's a bivariate chart, otherwise univariate
+  // Match the routes in App.jsx: /chart/univariate/:variable1 or /chart/bivariate/:variable1/:variable2
   const actualChartType = location.pathname.includes('/bivariate/') ? 'bivariate' : 'univariate';
   
   // Chart configuration from URL parameters

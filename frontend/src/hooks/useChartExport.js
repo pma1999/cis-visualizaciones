@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { exportAsImage, getFormattedDate } from '../utils/chartExport';
+import { exportChartAsImage, getFormattedDate } from '../utils/chartExport';
 import { getActiveFileInfo } from '../api/cisApi';
 
 /**
@@ -9,7 +9,7 @@ import { getActiveFileInfo } from '../api/cisApi';
  */
 const useChartExport = () => {
   const [exporting, setExporting] = useState(false);
-  const chartContainerRef = useRef(null);
+  const chartInstanceRef = useRef(null);
   const [activeFile, setActiveFile] = useState(null);
   
   // Fetch active file information on mount
@@ -29,70 +29,55 @@ const useChartExport = () => {
   }, []);
 
   /**
-   * Exporta el gráfico actual como imagen
+   * Exporta el gráfico actual como imagen usando Chart.js
    * 
-   * @param {Object} chartInfo - Información sobre el gráfico para la exportación
-   * @param {string} chartInfo.variable1Title - Título de la primera variable
-   * @param {string} chartInfo.variable2Title - Título de la segunda variable
-   * @param {string} chartInfo.chartType - Tipo de gráfico (stacked)
-   * @param {string} chartInfo.viewMode - Modo de visualización (absolute, relative)
-   * @param {boolean} chartInfo.darkMode - Si se está usando el modo oscuro
-   * @param {number} chartInfo.excludedValues1 - Cantidad de valores excluidos de la primera variable
-   * @param {number} chartInfo.excludedValues2 - Cantidad de valores excluidos de la segunda variable
+   * @param {Object} options - Opciones para la exportación
+   * @param {Chart} options.chartInstance - Instancia de Chart.js a exportar
+   * @param {string} options.filename - Nombre base del archivo sin extensión
+   * @param {string} options.title - Título para el gráfico exportado
+   * @param {string} options.subtitle - Subtítulo para el gráfico exportado
+   * @param {string} options.footnote - Nota al pie para el gráfico exportado
+   * @param {Array} options.legendItems - Elementos de la leyenda con color y texto
+   * @param {boolean} options.darkMode - Si debe usarse modo oscuro en la exportación
+   * @param {string} options.format - Formato de exportación (png, jpeg, webp)
+   * @returns {Promise<boolean>} - True si la exportación fue exitosa
    */
-  const handleExportChart = async ({ 
-    variable1Title = '', 
-    variable2Title = '', 
-    chartType = 'stacked', 
-    viewMode = 'absolute', 
-    darkMode = false, 
-    excludedValues1 = 0,
-    excludedValues2 = 0
-  }) => {
-    if (!chartContainerRef.current) return;
-    
-    setExporting(true);
+  const exportChart = async (options = {}) => {
     try {
-      // Preparar opciones para la exportación
-      const options = {
-        title: `Análisis bivariado de ${variable1Title} y ${variable2Title}`,
-        subtitle: `Tipo de gráfico: Barras apiladas`,
-        description: `Modo de visualización: ${viewMode === 'absolute' ? 'Valores absolutos' : 'Porcentajes'}`,
-        darkMode: darkMode,
-        chartType: chartType,
-        width: chartContainerRef.current.offsetWidth * 1.5,
-        height: chartContainerRef.current.offsetHeight * 1.5,
-        footnote: excludedValues1 || excludedValues2 ? 
-          `Valores excluidos: ${excludedValues1} en variable 1, ${excludedValues2} en variable 2` : 
-          undefined,
-        // Mejoras para garantizar una exportación perfecta
-        scale: 2, // Aumentar escala para mejor calidad
-        canvasOptions: {
-          logging: false, // Reducir ruido en consola
-          allowTaint: true, // Permitir contenido externo
-          useCORS: true, // Importante para imágenes externas
-          backgroundColor: darkMode ? '#0f172a' : '#ffffff',
-          windowWidth: window.innerWidth, // Asegurar que se capture todo el ancho
-          windowHeight: window.innerHeight // Asegurar altura correcta
-        },
-        skipCssColors: true // Manejar colores modernos como OKLCH que causan problemas
-      };
+      // Set exporting state
+      setExporting(true);
       
-      // Nombre del archivo
-      const filename = `grafico_bivariado_${variable1Title.replace(/\s+/g, '_')}_${variable2Title.replace(/\s+/g, '_')}_barras_${getFormattedDate()}`;
+      // Get chart instance, either from options or ref
+      const chartInstance = options.chartInstance || chartInstanceRef.current;
       
-      // Esperar a que el componente esté completamente renderizado
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Usar la función avanzada de exportación
-      const success = await exportAsImage(chartContainerRef.current, filename, options);
-      
-      if (!success) {
-        throw new Error("No se pudo exportar el gráfico");
+      if (!chartInstance) {
+        console.error("No chart instance found for export");
+        return false;
       }
+      
+      // Prepare filename
+      const filename = options.filename || `chart_${getFormattedDate()}`;
+      
+      // Execute the export
+      const success = await exportChartAsImage(chartInstance, filename, {
+        // Default options
+        format: options.format || 'png',
+        quality: options.quality || 0.95,
+        
+        // Metadata options
+        title: options.title || '',
+        subtitle: options.subtitle || '',
+        footnote: options.footnote || '',
+        legendItems: options.legendItems || [],
+        
+        // Style options
+        darkMode: options.darkMode || false
+      });
+      
+      return success;
     } catch (error) {
-      console.error("Error al exportar el gráfico:", error);
-      alert('Error al exportar el gráfico. Por favor, inténtelo de nuevo.');
+      console.error("Error exporting chart:", error);
+      return false;
     } finally {
       setExporting(false);
     }
@@ -113,16 +98,16 @@ const useChartExport = () => {
    * @param {boolean} chartInfo.isLocalFile - Si el archivo es local (opcional)
    */
   const openInNewTab = (options) => {
-    // Base URL for the fullscreen page
-    let baseUrl = '/fullscreen';
+    // Base URL for the chart pages - updated to match router paths in App.jsx
+    let baseUrl = '';
     
     // Determine if it's a univariate or bivariate chart
     if (options.variable1 && options.variable2) {
-      // Bivariate chart
-      baseUrl += `/bivariate/${options.variable1}/${options.variable2}`;
+      // Bivariate chart - use the correct path that matches router definition
+      baseUrl = `/chart/bivariate/${options.variable1}/${options.variable2}`;
     } else if (options.variable1) {
-      // Univariate chart
-      baseUrl += `/chart/${options.variable1}`;
+      // Univariate chart - use the correct path that matches router definition
+      baseUrl = `/chart/univariate/${options.variable1}`;
     } else {
       console.error("No variables provided for opening in new tab");
       return;
@@ -187,8 +172,9 @@ const useChartExport = () => {
 
   return {
     exporting,
-    chartContainerRef,
-    handleExportChart,
+    setExporting,
+    chartInstanceRef,
+    exportChart,
     openInNewTab,
     activeFile
   };

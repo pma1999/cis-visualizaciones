@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { getDistribucion } from "../api/cisApi";
 import { API_URL } from "../api/cisApi";
 import Chart from 'chart.js/auto';
-import { exportAsImage, getFormattedDate } from "../utils/chartExport";
+import { getFormattedDate } from "../utils/chartExport";
 import ChartControls from "./charts/ChartControls";
 import useChartExport from "../hooks/useChartExport";
 
@@ -36,11 +36,12 @@ export default function ChartComponent({
   const chartRef = useRef(null);
   const chartContainer = useRef(null);
 
-  // Use the export hook
+  // Use the export hook - now getting setExporting as well
   const { 
     exporting,
-    chartContainerRef,
-    handleExportChart,
+    setExporting,
+    chartInstanceRef,
+    exportChart,
     openInNewTab: openChartInNewTab
   } = useChartExport();
 
@@ -255,7 +256,10 @@ export default function ChartComponent({
     
     const ctx = chartRef.current.getContext('2d');
     const newChartInstance = new Chart(ctx, chartConfig);
+    
+    // Store the chart instance in both state and ref
     setChartInstance(newChartInstance);
+    chartInstanceRef.current = newChartInstance;
     
     return () => {
       if (newChartInstance) {
@@ -276,63 +280,74 @@ export default function ChartComponent({
     };
   }, []);
 
-  const downloadChart = async () => {
-    if (!chartRef.current) return;
+  // Enhanced chart export function
+  const handleChartExport = async (format = 'png') => {
+    if (!chartInstance) {
+      console.error("No chart instance available for export");
+      return;
+    }
     
     try {
-      setExporting(true);
+      // Create a filename with the variable name and date
+      const date = getFormattedDate();
+      const filename = `${variable}_chart_${date}`;
       
-      // Obtener el contenedor del gráfico (que contiene el canvas)
-      const chartContainer = chartRef.current.parentNode;
-      
-      // Preparar opciones para la exportación
-      const options = {
+      // Enhanced export options
+      const exportOptions = {
+        chartInstance: chartInstance,
+        filename: filename,
+        format: format,
         title: `Distribución de ${variable}`,
-        subtitle: `Tipo de gráfico: ${getChartTypeName()}`,
-        description: excludedValues.length > 0 ? `(${excludedValues.length} valores excluidos)` : "",
+        subtitle: `Tipo: ${getChartTypeName(chartType)}`,
+        footnote: `Generado el ${date}`,
         darkMode: darkMode,
-        chartType: chartType,
-        width: chartContainer.offsetWidth * 1.5,
-        height: chartContainer.offsetHeight * 1.5,
-        // Mejoras para garantizar una exportación perfecta
-        scale: 2, // Aumentar escala para mejor calidad
-        canvasOptions: {
-          logging: false, // Reducir ruido en consola
-          allowTaint: true, // Permitir contenido externo
-          useCORS: true, // Importante para imágenes externas
-          backgroundColor: darkMode ? '#0f172a' : '#ffffff',
-          windowWidth: window.innerWidth, // Asegurar que se capture todo el ancho
-          windowHeight: window.innerHeight // Asegurar altura correcta
-        },
-        skipCssColors: true, // Manejar colores modernos como OKLCH que causan problemas
-        // Extraer leyendas desde Chart.js
-        legendItems: chartInstance ? 
-          chartInstance.data.datasets[0].data.map((value, index) => ({
-            color: Array.isArray(chartInstance.data.datasets[0].backgroundColor) 
-              ? chartInstance.data.datasets[0].backgroundColor[index]
-              : chartInstance.data.datasets[0].backgroundColor,
-            text: chartInstance.data.labels[index]
-          })) : []
+        // Include legend items for all chart types
+        legendItems: chartInstance.data.datasets[0].data.map((value, index) => ({
+          color: Array.isArray(chartInstance.data.datasets[0].backgroundColor) 
+            ? chartInstance.data.datasets[0].backgroundColor[index]
+            : chartInstance.data.datasets[0].backgroundColor,
+          text: chartInstance.data.labels[index]
+        }))
       };
       
-      // Nombre del archivo
-      const filename = `grafico_${variable}_${chartType}_${getFormattedDate()}`;
-      
-      // Esperar a que el componente esté completamente renderizado
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Usar la función avanzada de exportación
-      const success = await handleExportChart(chartContainer, filename, options);
-      
-      if (!success) {
-        throw new Error("No se pudo exportar el gráfico");
-      }
-    } catch (err) {
-      console.error('Error al descargar el gráfico:', err);
-      alert('Error al descargar el gráfico');
-    } finally {
-      setExporting(false);
+      // Call the export function with the enhanced options
+      await exportChart(exportOptions);
+    } catch (error) {
+      console.error('Error exporting chart:', error);
     }
+  };
+
+  // Helper function to get human-readable chart type names
+  const getChartTypeName = (type) => {
+    const chartTypes = {
+      'bar': 'Barras',
+      'line': 'Líneas',
+      'pie': 'Pastel',
+      'doughnut': 'Anillo'
+    };
+    return chartTypes[type] || type;
+  };
+
+  // Add this function to ensure chart rendering for export
+  const prepareChartForExport = () => {
+    if (chartInstance) {
+      // Apply any pending animations or updates
+      chartInstance.update('none');
+      // Force render
+      chartInstance.render();
+    }
+  };
+
+  // Update the useEffect for exporting to include preparation
+  useEffect(() => {
+    if (exporting) {
+      prepareChartForExport();
+    }
+  }, [exporting]);
+
+  const downloadChart = async () => {
+    // Use the enhanced handleChartExport function with the selected format
+    await handleChartExport(downloadFormat);
   };
   
   const toggleFullscreen = () => {
@@ -376,16 +391,6 @@ export default function ChartComponent({
       </div>
     );
   }
-
-  const getChartTypeName = () => {
-    switch(chartType) {
-      case 'bar': return 'barras';
-      case 'line': return 'líneas';
-      case 'pie': return 'sectores';
-      case 'doughnut': return 'anillo';
-      default: return 'barras';
-    }
-  };
 
   return (
     <div className={`relative ${darkMode ? 'text-white' : 'text-gray-800'}`}>

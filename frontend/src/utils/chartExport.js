@@ -1,671 +1,404 @@
-import html2canvas from 'html2canvas';
-import { saveSvgAsPng } from 'save-svg-as-png';
-import { renderToString } from 'react-dom/server';
-
 /**
- * Formatea la fecha actual para usar en nombres de archivo
- * @returns {string} Fecha formateada (YYYY-MM-DD_HH-MM-SS)
+ * Chart Export Utility
+ * Provides robust methods to export Chart.js charts to images
  */
+
+// Helper function for formatted date used in filenames
 export const getFormattedDate = () => {
   const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
 /**
- * Crea un contenedor dedicado para la exportación del gráfico
- * @param {Object} dimensions - Dimensiones del contenedor
- * @returns {HTMLElement} Contenedor creado
+ * Gets the device pixel ratio for high-quality exports on high-DPI displays
+ * @returns {number} The device pixel ratio or 1 if not available
  */
-const createExportContainer = (dimensions = { width: 800, height: 600 }) => {
-  // Eliminar contenedor existente si hay alguno
-  const existingContainer = document.getElementById('chart-export-container');
-  if (existingContainer) {
-    document.body.removeChild(existingContainer);
-  }
-  
-  // Crear nuevo contenedor con ID único
-  const container = document.createElement('div');
-  container.id = 'chart-export-container';
-  container.style.position = 'fixed';
-  container.style.left = '-9999px';
-  container.style.top = 0;
-  container.style.width = `${dimensions.width}px`;
-  container.style.height = `${dimensions.height}px`;
-  container.style.backgroundColor = '#ffffff';
-  container.style.padding = '0';
-  container.style.margin = '0';
-  container.style.overflow = 'hidden';
-  container.style.fontFamily = 'Arial, sans-serif';
-  container.style.boxSizing = 'border-box';
-  container.style.zIndex = '-9999';
-  
-  document.body.appendChild(container);
-  return container;
+const getDevicePixelRatio = () => {
+  return window.devicePixelRatio || 
+         window.screen.deviceXDPI / window.screen.logicalXDPI || 1;
 };
 
 /**
- * Crea y agrega una sección de título al contenedor de exportación
- * @param {HTMLElement} container - Contenedor donde se agregará el título
- * @param {Object} options - Opciones de configuración del título
+ * Creates a new canvas with the specified dimensions and returns its context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {boolean} highRes - Whether to create a high-resolution canvas
+ * @returns {Object} Object containing the canvas and its context
  */
-const addTitleSection = (container, options) => {
-  const titleSection = document.createElement('div');
-  titleSection.style.textAlign = 'center';
-  titleSection.style.padding = '20px 10px';
-  titleSection.style.borderBottom = '1px solid #eaeaea';
-  titleSection.style.backgroundColor = '#ffffff';
-  titleSection.style.width = '100%';
+const createCanvas = (width, height, highRes = true) => {
+  const canvas = document.createElement('canvas');
+  const dpr = highRes ? getDevicePixelRatio() : 1;
   
-  titleSection.innerHTML = `
-    <h2 style="font-size: 22px; margin: 0 0 10px 0; font-weight: bold; color: #333;">${options.title || ''}</h2>
-    ${options.subtitle ? `<p style="font-size: 16px; margin: 0 0 5px 0; color: #555;">${options.subtitle}</p>` : ''}
-    ${options.description ? `<p style="font-size: 14px; margin: 5px 0 0 0; color: #777;">${options.description}</p>` : ''}
-  `;
+  // Set display size
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
   
-  container.appendChild(titleSection);
+  // Set actual size adjusted for device pixel ratio
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  
+  // Get context and scale according to device pixel ratio
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  
+  return { canvas, ctx, dpr };
 };
 
 /**
- * Crea y agrega una sección de leyenda al contenedor de exportación
- * @param {HTMLElement} container - Contenedor donde se agregará la leyenda
- * @param {Array} legendItems - Elementos de la leyenda (color, texto)
- * @param {Object} options - Opciones de configuración
+ * Renders text with word wrapping within a specified width
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {string} text - Text to render
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} maxWidth - Maximum width for text wrapping
+ * @param {number} lineHeight - Line height multiplier
+ * @returns {number} Y position after the text has been drawn
  */
-const addLegendSection = (container, legendItems, options = {}) => {
-  if (!legendItems || !legendItems.length) return;
+const renderWrappedText = (ctx, text, x, y, maxWidth, lineHeight = 1.2) => {
+  if (!text) return y;
   
-  const legendSection = document.createElement('div');
-  legendSection.style.padding = '15px';
-  legendSection.style.textAlign = options.legendAlign || 'center';
-  legendSection.style.display = 'flex';
-  legendSection.style.flexWrap = 'wrap';
-  legendSection.style.justifyContent = 'center';
-  legendSection.style.gap = '15px';
-  legendSection.style.width = '100%';
-  legendSection.style.borderTop = '1px solid #eaeaea';
-  legendSection.style.marginTop = '10px';
+  const words = text.split(' ');
+  const fontSize = parseInt(ctx.font.split('px')[0], 10) || 12;
+  const computedLineHeight = fontSize * lineHeight;
   
-  legendItems.forEach(item => {
-    const legendItem = document.createElement('div');
-    legendItem.style.display = 'flex';
-    legendItem.style.alignItems = 'center';
-    legendItem.style.marginRight = '15px';
+  let line = '';
+  let currentY = y;
+  
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + (line ? ' ' : '') + words[i];
+    const metrics = ctx.measureText(testLine);
     
-    const colorBox = document.createElement('div');
-    colorBox.style.width = '15px';
-    colorBox.style.height = '15px';
-    colorBox.style.backgroundColor = item.color;
-    colorBox.style.marginRight = '8px';
-    colorBox.style.borderRadius = '3px';
-    
-    const label = document.createElement('span');
-    label.style.fontSize = '14px';
-    label.style.color = '#333';
-    label.textContent = item.text;
-    
-    legendItem.appendChild(colorBox);
-    legendItem.appendChild(label);
-    legendSection.appendChild(legendItem);
-  });
-  
-  container.appendChild(legendSection);
-};
-
-/**
- * Agrega una nota al pie para información adicional como valores excluidos
- * @param {HTMLElement} container - Contenedor donde se agregará la nota
- * @param {string} text - Texto de la nota
- */
-const addFootnoteSection = (container, text) => {
-  if (!text) return;
-  
-  const footnoteSection = document.createElement('div');
-  footnoteSection.style.padding = '10px 15px';
-  footnoteSection.style.borderTop = '1px solid #eaeaea';
-  footnoteSection.style.fontSize = '12px';
-  footnoteSection.style.color = '#666';
-  footnoteSection.style.textAlign = 'center';
-  footnoteSection.style.width = '100%';
-  footnoteSection.textContent = text;
-  
-  container.appendChild(footnoteSection);
-};
-
-/**
- * Obtiene configuraciones específicas según el dispositivo
- * @returns {Object} Configuraciones específicas del dispositivo
- */
-const getDeviceSpecificSettings = () => {
-  const isMobile = window.innerWidth < 768;
-  const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
-  
-  return {
-    width: isMobile ? 800 : 1200,
-    height: isMobile ? 700 : 900,
-    legendPosition: isMobile ? 'bottom' : 'right',
-    chartHeight: isMobile ? 500 : 600,
-    fontSize: {
-      title: isMobile ? 16 : 20,
-      subtitle: isMobile ? 14 : 16,
-      labels: isMobile ? 12 : 14,
-      legend: isMobile ? 10 : 12
-    },
-    margins: isMobile 
-      ? { top: 10, right: 10, bottom: 60, left: 30 }
-      : { top: 20, right: 20, bottom: 40, left: 40 }
-  };
-};
-
-/**
- * Optimiza un elemento SVG para la exportación
- * @param {SVGElement} svgElement - Elemento SVG a optimizar
- * @param {number} width - Ancho deseado
- * @param {number} height - Altura deseada
- */
-const optimizeSvgForExport = (svgElement, width, height) => {
-  if (!svgElement) return;
-  
-  // Aplicar dimensiones explícitas
-  svgElement.setAttribute('width', width);
-  svgElement.setAttribute('height', height);
-  
-  // Asegurar que el SVG tiene viewBox
-  if (!svgElement.getAttribute('viewBox')) {
-    svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  }
-  
-  // Optimización adicional para aprovechar el espacio
-  svgElement.style.display = 'block';
-  svgElement.style.margin = '0 auto';
-  svgElement.style.maxWidth = '100%';
-  svgElement.style.maxHeight = '100%';
-  
-  // Optimizar textos y fuentes
-  svgElement.setAttribute('font-family', 'Arial, sans-serif');
-  svgElement.setAttribute('text-rendering', 'geometricPrecision');
-  
-  // Optimizar textos individuales
-  const textElements = svgElement.querySelectorAll('text');
-  textElements.forEach(text => {
-    if (!text.getAttribute('font-family')) {
-      text.setAttribute('font-family', 'Arial, sans-serif');
-    }
-    
-    // Garantizar visibilidad del texto
-    const currentFontSize = text.getAttribute('font-size');
-    if (!currentFontSize || parseInt(currentFontSize) < 10) {
-      text.setAttribute('font-size', '12');
-    }
-    
-    // Mejorar legibilidad con un ligero contorno
-    if (!text.getAttribute('stroke-width')) {
-      text.setAttribute('stroke-width', '0.5');
-      text.setAttribute('stroke', 'rgba(255,255,255,0.5)');
-      text.setAttribute('paint-order', 'stroke');
-    }
-  });
-};
-
-/**
- * Clona y prepara el gráfico original para exportación
- * @param {HTMLElement} originalChartElement - Elemento del gráfico original
- * @param {HTMLElement} container - Contenedor de exportación
- * @param {Object} options - Opciones de configuración
- * @returns {HTMLElement} Elemento del gráfico clonado y optimizado
- */
-const prepareChartForExport = (originalChartElement, container, options) => {
-  // Crear contenedor para el gráfico
-  const chartContainer = document.createElement('div');
-  chartContainer.style.width = '100%';
-  chartContainer.style.height = `${options.chartHeight || 500}px`;
-  chartContainer.style.position = 'relative';
-  chartContainer.style.margin = '10px 0';
-  
-  // Clonar el SVG original
-  const originalSvg = originalChartElement.querySelector('svg');
-  if (originalSvg) {
-    const clonedSvg = originalSvg.cloneNode(true);
-    
-    // Optimizar el SVG para exportación
-    optimizeSvgForExport(clonedSvg, container.offsetWidth, options.chartHeight || 500);
-    
-    // Agregar el SVG optimizado al contenedor
-    chartContainer.appendChild(clonedSvg);
-  } else {
-    // Si no hay SVG, clonar todo el contenido del gráfico
-    const chartContent = originalChartElement.querySelector('.h-\\[calc\\(100\\%-60px\\)\\], .h-\\[calc\\(100\\%-80px\\)\\]');
-    if (chartContent) {
-      chartContainer.innerHTML = chartContent.innerHTML;
+    if (metrics.width > maxWidth && i > 0) {
+      ctx.fillText(line, x, currentY);
+      line = words[i];
+      currentY += computedLineHeight;
     } else {
-      // Último recurso: clonar todo
-      chartContainer.innerHTML = originalChartElement.innerHTML;
+      line = testLine;
     }
   }
   
-  container.appendChild(chartContainer);
-  return chartContainer;
+  ctx.fillText(line, x, currentY);
+  return currentY + computedLineHeight;
 };
 
 /**
- * Extrae información del gráfico original para la exportación
- * @param {HTMLElement} chartElement - Elemento del gráfico original
- * @returns {Object} Información extraída del gráfico
+ * Renders the title section (title, subtitle) on the canvas
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {Object} options - Title options
+ * @param {number} width - Canvas width
+ * @returns {number} The Y position after the title section
  */
-const extractChartInfo = (chartElement) => {
-  const info = {
-    title: '',
-    subtitle: '',
-    description: '',
-    legendItems: []
-  };
+const renderTitleSection = (ctx, options, width) => {
+  const { title, subtitle, darkMode } = options;
+  const padding = 20;
+  let currentY = padding;
   
-  // Extraer título si existe
-  const titleElement = chartElement.querySelector('h3');
-  if (titleElement) {
-    info.title = titleElement.textContent.trim();
+  // Default title color based on mode
+  const titleColor = darkMode ? '#ffffff' : '#333333';
+  const subtitleColor = darkMode ? '#cccccc' : '#666666';
+  
+  // Title
+  if (title) {
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.fillStyle = titleColor;
+    ctx.textAlign = 'center';
+    currentY = renderWrappedText(ctx, title, width / 2, currentY, width - padding * 2) + 5;
   }
   
-  const subtitleElement = chartElement.querySelector('.chart-subtitle');
-  if (subtitleElement) {
-    info.subtitle = subtitleElement.textContent.trim();
+  // Subtitle
+  if (subtitle) {
+    ctx.font = '14px Arial, sans-serif';
+    ctx.fillStyle = subtitleColor;
+    ctx.textAlign = 'center';
+    currentY = renderWrappedText(ctx, subtitle, width / 2, currentY, width - padding * 2) + 10;
   }
   
-  const descriptionElement = chartElement.querySelector('.text-xs, .chart-description');
-  if (descriptionElement) {
-    info.description = descriptionElement.textContent.trim();
-  }
-  
-  // Extraer elementos de leyenda de Chart.js si existen
-  // Chart.js crea elementos li para la leyenda
-  const legendElements = chartElement.querySelectorAll('canvas + div ul li');
-  if (legendElements && legendElements.length) {
-    legendElements.forEach(item => {
-      const colorBoxElement = item.querySelector('span');
-      const textContent = item.textContent.trim();
-      
-      if (colorBoxElement && textContent) {
-        const color = window.getComputedStyle(colorBoxElement).backgroundColor || '#333';
-        
-        info.legendItems.push({
-          color: color,
-          text: textContent
-        });
-      }
-    });
-  }
-  
-  return info;
+  return currentY;
 };
 
 /**
- * Exporta un gráfico como imagen usando Canvas
- * @param {HTMLElement} container - Contenedor con el gráfico a exportar
- * @param {string} filename - Nombre del archivo a descargar
- * @param {Object} options - Opciones para html2canvas
+ * Renders the legend items on the canvas
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {Array} legendItems - Legend items with color and text
+ * @param {Object} options - Legend options
+ * @param {number} startY - Starting Y position
+ * @param {number} width - Canvas width
+ * @returns {number} The Y position after the legend has been drawn
  */
-const exportUsingCanvas = async (container, filename, options = {}) => {
-  try {
-    console.log('Exportando usando canvas con contenedor de tamaño:', container.offsetWidth, 'x', container.scrollHeight);
+const renderLegendSection = (ctx, legendItems, options, startY, width) => {
+  if (!legendItems || legendItems.length === 0) return startY;
+  
+  const { darkMode } = options;
+  const textColor = darkMode ? '#ffffff' : '#333333';
+  const padding = 20;
+  const itemHeight = 20;
+  const boxWidth = 15;
+  const boxHeight = 15;
+  const boxPadding = 5;
+  
+  let currentY = startY + 10;
+  const legendWidth = width - (padding * 2);
+  
+  // Calculate layout
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillStyle = textColor;
+  ctx.textAlign = 'left';
+  
+  // Determine if we need multiple columns for the legend
+  // Maximum items per column based on available height
+  const maxItemsPerColumn = 10;
+  const columns = Math.ceil(legendItems.length / maxItemsPerColumn);
+  const itemsPerColumn = Math.ceil(legendItems.length / columns);
+  const columnWidth = legendWidth / columns;
+  
+  legendItems.forEach((item, index) => {
+    const column = Math.floor(index / itemsPerColumn);
+    const rowInColumn = index % itemsPerColumn;
     
-    // Si se activa la opción skipCssColors, intentamos reemplazar los colores OKLCH con alternativas compatibles
-    if (options.skipCssColors) {
-      // Guardar una referencia a los estilos originales
-      const elementsToRestore = [];
-      
-      try {
-        // Buscar elementos con posibles colores problemáticos
-        const allElements = container.querySelectorAll('*');
-        allElements.forEach(el => {
-          const style = window.getComputedStyle(el);
-          const originalStyles = {};
-          let needsRestore = false;
-          
-          // Lista de formatos de color problemáticos
-          const problematicColorFormats = ['oklch', 'oklab', 'lch', 'lab', 'hsl('];
-          
-          // Verificar propiedades de color comunes que podrían usar formatos de color problemáticos
-          const colorProps = ['backgroundColor', 'color', 'borderColor', 'fill', 'stroke'];
-          colorProps.forEach(prop => {
-            const cssName = prop.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`); // camelCase a kebab-case
-            const value = style[prop];
-            
-            if (value && typeof value === 'string') {
-              const hasProblematicFormat = problematicColorFormats.some(format => 
-                value.toLowerCase().includes(format)
-              );
-              
-              if (hasProblematicFormat) {
-                // Determinar si es un modo oscuro basado en análisis de colores
-                // Un análisis simple es mirar si el color de fondo es oscuro
-                const isDarkMode = options.darkMode || (
-                  style.backgroundColor && 
-                  style.backgroundColor.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/) && 
-                  (parseInt(RegExp.$1) + parseInt(RegExp.$2) + parseInt(RegExp.$3)) / 3 < 128
-                );
-                
-                // Guardar el estilo original para restaurarlo después
-                originalStyles[cssName] = el.style[prop];
-                needsRestore = true;
-                
-                // Aplicar colores de reemplazo según el tipo de propiedad y el modo
-                if (prop === 'color') {
-                  // Para texto
-                  el.style[prop] = isDarkMode ? '#e2e8f0' : '#1e293b';
-                } else if (prop === 'backgroundColor') {
-                  // Para fondos
-                  el.style[prop] = isDarkMode ? '#1e293b' : '#f8fafc';
-                } else if (prop === 'fill') {
-                  // Para rellenos SVG
-                  el.style[prop] = isDarkMode ? '#4b5563' : '#334155';
-                } else if (prop === 'stroke') {
-                  // Para bordes SVG
-                  el.style[prop] = isDarkMode ? '#6b7280' : '#64748b';
-                } else {
-                  // Para otros tipos de propiedades
-                  el.style[prop] = isDarkMode ? '#4b5563' : '#cbd5e1';
-                }
-              }
-            }
-          });
-          
-          if (needsRestore) {
-            elementsToRestore.push({ element: el, originalStyles });
-          }
-        });
-      } catch (error) {
-        console.warn('Error al procesar colores CSS:', error);
-      }
-      
-      // Guardar una referencia a la función de restauración para usarla después
-      const restoreOriginalStyles = () => {
-        elementsToRestore.forEach(({ element, originalStyles }) => {
-          Object.entries(originalStyles).forEach(([prop, value]) => {
-            element.style[prop] = value;
-          });
-        });
-      };
-      
-      // Configurar para restaurar los estilos después de la captura
-      setTimeout(() => {
-        restoreOriginalStyles();
-      }, 5000); // Darle tiempo suficiente a html2canvas para capturar
-    }
+    const x = padding + (column * columnWidth);
+    const y = currentY + (rowInColumn * itemHeight);
     
-    // Opciones para html2canvas
-    const canvasOptions = {
-      scale: options.scale || 2, // Mayor escala para mejor calidad
-      useCORS: true, // Permitir imágenes de otros dominios
-      allowTaint: true, // Permitir que se contamine el canvas con imágenes externas
-      backgroundColor: options.darkMode ? '#0f172a' : '#ffffff', // Color de fondo según modo
-      windowWidth: container.scrollWidth,
-      windowHeight: container.scrollHeight,
-      logging: false, // Desactivar logs para mejorar rendimiento
-      ...options.canvasOptions // Permitir opciones personalizadas adicionales
-    };
+    // Draw color box
+    ctx.fillStyle = item.color;
+    ctx.fillRect(x, y - boxHeight + 4, boxWidth, boxHeight);
     
-    // Capturar el elemento como canvas
-    const canvas = await html2canvas(container, canvasOptions);
-    
-    // Convertir canvas a URL de datos (blob para formato ajustable)
-    canvas.toBlob((blob) => {
-      // Crear URL para el blob
-      const url = URL.createObjectURL(blob);
-      
-      // Crear enlace para descarga
-      const downloadLink = document.createElement('a');
-      downloadLink.href = url;
-      downloadLink.download = `${filename}.png`;
-      
-      // Simular clic para descargar
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      
-      // Liberar URL
-      setTimeout(() => URL.revokeObjectURL(url), 100);
-    }, 'image/png');
-    
-    return true;
-  } catch (error) {
-    console.error('Error al exportar usando Canvas:', error);
+    // Draw item text
+    ctx.fillStyle = textColor;
+    ctx.fillText(item.text, x + boxWidth + boxPadding, y);
+  });
+  
+  // Return the position after the legend
+  return currentY + (itemsPerColumn * itemHeight) + 10;
+};
+
+/**
+ * Renders the footnote text on the canvas
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {string} footnote - Footnote text
+ * @param {boolean} darkMode - Dark mode setting
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ */
+const renderFootnoteSection = (ctx, footnote, darkMode, width, height) => {
+  if (!footnote) return;
+  
+  const padding = 20;
+  const footnoteColor = darkMode ? '#aaaaaa' : '#888888';
+  
+  ctx.font = '11px Arial, sans-serif';
+  ctx.fillStyle = footnoteColor;
+  ctx.textAlign = 'right';
+  ctx.fillText(footnote, width - padding, height - padding);
+};
+
+/**
+ * Creates a background for the canvas
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {boolean} darkMode - Dark mode setting
+ */
+const renderBackground = (ctx, width, height, darkMode) => {
+  ctx.fillStyle = darkMode ? '#1e293b' : '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+};
+
+/**
+ * Main function to export a Chart.js chart as an image
+ * @param {Chart} chartInstance - Chart.js chart instance
+ * @param {string} filename - Base filename without extension
+ * @param {Object} options - Export options
+ * @returns {Promise<boolean>} Success status
+ */
+export const exportChartAsImage = async (chartInstance, filename, options = {}) => {
+  if (!chartInstance || !chartInstance.canvas) {
+    console.error('Invalid chart instance provided for export');
     return false;
   }
-};
-
-/**
- * Exporta un SVG como imagen PNG
- * @param {HTMLElement} container - Contenedor con el SVG
- * @param {string} filename - Nombre del archivo a descargar
- * @param {Object} options - Opciones para saveSvgAsPng
- * @returns {boolean} Éxito de la operación
- */
-const exportUsingSvg = async (container, filename, options = {}) => {
+  
   try {
-    const svgElement = container.querySelector('svg');
-    if (!svgElement) return false;
-    
-    // Optimizar SVG
-    optimizeSvgForExport(svgElement, container.offsetWidth, container.offsetHeight);
-    
-    // Configuración para saveSvgAsPng
-    const svgOptions = {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      encoderOptions: 1.0,
+    // Prepare options with defaults
+    const exportOptions = {
+      // Export format
+      format: 'png', // 'png', 'jpeg', 'webp'
+      quality: 0.95, // 0-1 quality for jpeg/webp
+      
+      // Content options
+      title: '',
+      subtitle: '',
+      footnote: '',
+      legendItems: [],
+      
+      // Style options
+      darkMode: false,
+      padding: 20,
+      titleHeight: 60, // Estimated height for title section
+      legendHeight: 40, // Estimated height for legend
+      
+      // Size options
+      width: null, // Will use chart width if null
+      height: null, // Will use chart height if null
+      maxWidth: 3000,
+      maxHeight: 3000,
+      
+      // Override defaults with user options
       ...options
     };
     
-    // Exportar el SVG como PNG
-    await saveSvgAsPng(svgElement, `${filename}.png`, svgOptions);
+    // Temporarily disable animations
+    const prevAnimation = chartInstance.options.animation;
+    chartInstance.options.animation = false;
+    
+    // Force a redraw to ensure chart is completely rendered
+    chartInstance.update('none');
+    chartInstance.render();
+    
+    // Get the chart canvas and its dimensions
+    const chartCanvas = chartInstance.canvas;
+    
+    // Determine export dimensions
+    let exportWidth = exportOptions.width || chartCanvas.width;
+    let exportHeight = exportOptions.height || chartCanvas.height;
+    
+    // Adjust for device pixel ratio if dimensions are from chart
+    if (!exportOptions.width) exportWidth = exportWidth / getDevicePixelRatio();
+    if (!exportOptions.height) exportHeight = exportHeight / getDevicePixelRatio();
+    
+    // Ensure dimensions don't exceed maximums
+    exportWidth = Math.min(exportWidth, exportOptions.maxWidth);
+    exportHeight = Math.min(exportHeight, exportOptions.maxHeight);
+    
+    // Calculate space needed for metadata
+    let metadataHeight = exportOptions.padding * 2; // Top and bottom padding
+    
+    // Add title height if title or subtitle exist
+    if (exportOptions.title || exportOptions.subtitle) {
+      metadataHeight += exportOptions.titleHeight;
+    }
+    
+    // Add legend height if legend items exist
+    if (exportOptions.legendItems && exportOptions.legendItems.length > 0) {
+      metadataHeight += exportOptions.legendHeight;
+    }
+    
+    // Create the composite canvas
+    const { canvas, ctx, dpr } = createCanvas(
+      exportWidth,
+      exportHeight + metadataHeight,
+      true // High-resolution
+    );
+    
+    // Draw background
+    renderBackground(ctx, exportWidth, exportHeight + metadataHeight, exportOptions.darkMode);
+    
+    // Draw title section and get the Y position after it
+    const titleEndY = renderTitleSection(ctx, exportOptions, exportWidth);
+    
+    // Calculate space for the chart
+    const chartY = titleEndY;
+    const chartHeight = exportHeight;
+    
+    // Draw the chart
+    ctx.drawImage(
+      chartCanvas,
+      0, 0, chartCanvas.width, chartCanvas.height, // Source
+      0, chartY, exportWidth, chartHeight          // Destination
+    );
+    
+    // Draw the legend section after the chart if provided
+    const legendEndY = renderLegendSection(
+      ctx,
+      exportOptions.legendItems,
+      exportOptions,
+      chartY + chartHeight,
+      exportWidth
+    );
+    
+    // Draw footnote if provided
+    renderFootnoteSection(
+      ctx,
+      exportOptions.footnote,
+      exportOptions.darkMode,
+      exportWidth,
+      exportHeight + metadataHeight
+    );
+    
+    // Convert canvas to blob
+    const fileExt = exportOptions.format.toLowerCase();
+    const mimeType = `image/${fileExt}`;
+    
+    const blob = await new Promise(resolve => {
+      canvas.toBlob(blob => resolve(blob), mimeType, exportOptions.quality);
+    });
+    
+    if (!blob) throw new Error('Failed to convert canvas to blob');
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}.${fileExt}`;
+    document.body.appendChild(link);
+    
+    // Trigger download
+    link.click();
+    
+    // Clean up
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    // Restore chart animation setting
+    chartInstance.options.animation = prevAnimation;
+    
     return true;
   } catch (error) {
-    console.error('Error al exportar usando SVG:', error);
+    console.error('Error exporting chart:', error);
+    
+    // Attempt to restore chart to original state
+    if (chartInstance) {
+      chartInstance.options.animation = true;
+      chartInstance.update();
+    }
+    
     return false;
   }
 };
 
 /**
- * Crea un elemento HTML completo para exportar, incluyendo título, subtítulo y leyenda
- * @param {HTMLElement} originalElement - Elemento del gráfico original
- * @param {Object} options - Opciones de configuración
- * @returns {HTMLElement} Elemento completo listo para exportar
+ * Backward compatibility function for DOM element export (like tables)
+ * This function uses html2canvas to capture DOM elements
+ * @param {HTMLElement|Object} element - DOM element or Chart.js instance
+ * @param {string} filename - Base filename without extension
+ * @param {Object} options - Export options
+ * @returns {Promise<boolean>} Success status
  */
-const createCompleteChartElement = (originalElement, options) => {
-  // Extraer información del gráfico original
-  const chartInfo = extractChartInfo(originalElement);
-  
-  // Crear un nuevo contenedor para el gráfico completo
-  const completeContainer = document.createElement('div');
-  completeContainer.style.fontFamily = 'Arial, sans-serif';
-  completeContainer.style.backgroundColor = options.darkMode ? '#0f172a' : '#ffffff';
-  completeContainer.style.border = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
-  completeContainer.style.borderRadius = '8px';
-  completeContainer.style.overflow = 'hidden';
-  completeContainer.style.width = `${options.width || 800}px`;
-  completeContainer.style.boxShadow = options.darkMode ? 
-    '0 4px 12px rgba(0,0,0,0.25)' : 
-    '0 2px 10px rgba(0,0,0,0.05)';
-  completeContainer.style.color = options.darkMode ? '#e2e8f0' : '#1e293b';
-  
-  // 1. Agregar sección de título
-  const titleSection = document.createElement('div');
-  titleSection.style.padding = '15px 10px';
-  titleSection.style.borderBottom = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
-  titleSection.style.textAlign = 'center';
-  
-  const title = document.createElement('h2');
-  title.style.margin = '0 0 5px 0';
-  title.style.fontSize = '22px';
-  title.style.fontWeight = 'bold';
-  title.style.color = options.darkMode ? '#f1f5f9' : '#333';
-  title.textContent = options.title || chartInfo.title || '';
-  
-  titleSection.appendChild(title);
-  
-  if (options.subtitle || chartInfo.subtitle) {
-    const subtitle = document.createElement('p');
-    subtitle.style.margin = '0 0 3px 0';
-    subtitle.style.fontSize = '16px';
-    subtitle.style.color = options.darkMode ? '#cbd5e1' : '#555';
-    subtitle.textContent = options.subtitle || chartInfo.subtitle || '';
-    titleSection.appendChild(subtitle);
+export const exportAsImage = async (element, filename, options = {}) => {
+  // If it's a Chart.js instance, use the new function
+  if (element && element.canvas) {
+    return exportChartAsImage(element, filename, options);
   }
   
-  if (options.description || chartInfo.description) {
-    const description = document.createElement('p');
-    description.style.margin = '3px 0 0 0';
-    description.style.fontSize = '14px';
-    description.style.color = options.darkMode ? '#94a3b8' : '#777';
-    description.textContent = options.description || chartInfo.description || '';
-    titleSection.appendChild(description);
-  }
-  
-  completeContainer.appendChild(titleSection);
-  
-  // 2. Clonar y ajustar el contenido del gráfico original
-  const chartContent = document.createElement('div');
-  chartContent.style.padding = '15px';
-  chartContent.style.textAlign = 'center';
-  chartContent.style.backgroundColor = options.darkMode ? '#1e293b' : '#ffffff';
-  
-  // Clonar el elemento original
-  const chartClone = originalElement.cloneNode(true);
-  
-  // Asegurarse que el gráfico clonado tenga las dimensiones correctas
-  chartClone.style.width = '100%';
-  chartClone.style.maxWidth = '100%';
-  chartClone.style.height = 'auto';
-  chartClone.style.minHeight = '300px';
-  chartClone.style.margin = '0 auto';
-  
-  chartContent.appendChild(chartClone);
-  completeContainer.appendChild(chartContent);
-  
-  // 3. Agregar leyenda si está disponible
-  if (chartInfo.legendItems && chartInfo.legendItems.length > 0) {
-    const legendSection = document.createElement('div');
-    legendSection.style.padding = '10px 15px 15px';
-    legendSection.style.borderTop = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
-    legendSection.style.display = 'flex';
-    legendSection.style.flexWrap = 'wrap';
-    legendSection.style.justifyContent = 'center';
-    legendSection.style.gap = '10px';
-    
-    chartInfo.legendItems.forEach(item => {
-      const legendItem = document.createElement('div');
-      legendItem.style.display = 'flex';
-      legendItem.style.alignItems = 'center';
-      legendItem.style.marginRight = '15px';
-      
-      const colorBox = document.createElement('span');
-      colorBox.style.display = 'inline-block';
-      colorBox.style.width = '12px';
-      colorBox.style.height = '12px';
-      colorBox.style.backgroundColor = item.color;
-      colorBox.style.marginRight = '5px';
-      colorBox.style.borderRadius = '2px';
-      
-      const label = document.createElement('span');
-      label.style.fontSize = '13px';
-      label.style.color = options.darkMode ? '#cbd5e1' : '#666';
-      label.textContent = item.text;
-      
-      legendItem.appendChild(colorBox);
-      legendItem.appendChild(label);
-      legendSection.appendChild(legendItem);
-    });
-    
-    completeContainer.appendChild(legendSection);
-  }
-  
-  // 4. Agregar pie de página si está disponible
-  if (options.footnote) {
-    const footnoteSection = document.createElement('div');
-    footnoteSection.style.padding = '8px 15px';
-    footnoteSection.style.borderTop = `1px solid ${options.darkMode ? '#1e293b' : '#eaeaea'}`;
-    footnoteSection.style.fontSize = '12px';
-    footnoteSection.style.color = options.darkMode ? '#94a3b8' : '#777';
-    footnoteSection.style.textAlign = 'left';
-    footnoteSection.textContent = options.footnote;
-    
-    completeContainer.appendChild(footnoteSection);
-  }
-  
-  return completeContainer;
-};
-
-/**
- * Función unificada que maneja la exportación de todos los tipos de gráficos
- * @param {HTMLElement} originalChartElement - Elemento del gráfico original
- * @param {string} filename - Nombre del archivo a descargar
- * @param {Object} userOptions - Opciones proporcionadas por el usuario
- * @returns {Promise<boolean>} Éxito de la operación
- */
-export const exportAsImage = async (originalChartElement, filename, userOptions = {}) => {
-  if (!originalChartElement) {
-    console.error('No se proporcionó un elemento para exportar');
+  // If it's a DOM element, use html2canvas approach
+  if (!(element instanceof HTMLElement)) {
+    console.error('Invalid element provided for export');
     return false;
   }
   
   try {
-    // 1. Obtener configuraciones según el dispositivo
-    const deviceSettings = getDeviceSpecificSettings();
+    // Dynamically import html2canvas - only load it when needed
+    const html2canvas = await import('html2canvas').then(module => module.default);
     
-    // 2. Combinar opciones de usuario con configuraciones por defecto
-    const options = { 
-      ...deviceSettings,
-      ...userOptions,
-      chartType: userOptions.chartType || 'default',
-      skipCssColors: userOptions.skipCssColors || false, // Opción para manejar colores problemáticos como OKLCH
-      darkMode: userOptions.darkMode || false // Asegurar que darkMode siempre esté definido
-    };
+    // Capture the element
+    const canvas = await html2canvas(element, options.canvasOptions || {});
     
-    // 3. Extraer información del gráfico original
-    const chartInfo = extractChartInfo(originalChartElement);
-    options.title = options.title || chartInfo.title || '';
-    options.subtitle = options.subtitle || chartInfo.subtitle || '';
-    options.description = options.description || chartInfo.description || '';
-    options.legendItems = options.legendItems || chartInfo.legendItems || [];
+    // Create a download link
+    const link = document.createElement('a');
+    link.download = `${filename}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
     
-    console.log('Información extraída del gráfico:', {
-      title: options.title,
-      subtitle: options.subtitle,
-      description: options.description,
-      legendItems: options.legendItems.map(item => item.text ? `${item.text}: ${item.color}` : 'sin texto').join(', '),
-      footnote: options.footnote || ''
-    });
-    
-    // 4. Crear un elemento visual completo con HTML
-    const completeChartElement = createCompleteChartElement(originalChartElement, options);
-    
-    // 5. Agregar temporalmente al body para poder capturarlo
-    completeChartElement.style.position = 'fixed';
-    completeChartElement.style.top = '0';
-    completeChartElement.style.left = '-9999px';
-    completeChartElement.style.zIndex = '-9999';
-    document.body.appendChild(completeChartElement);
-    
-    // 6. Dar tiempo al navegador para renderizar correctamente
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    try {
-      // 7. Exportar usando Canvas
-      const success = await exportUsingCanvas(completeChartElement, filename, options);
-      
-      return success;
-    } finally {
-      // 8. Limpiar: eliminar el elemento temporal
-      document.body.removeChild(completeChartElement);
-    }
+    return true;
   } catch (error) {
-    console.error('Error al exportar como imagen:', error);
+    console.error('Error exporting DOM element as image:', error);
     return false;
   }
 }; 

@@ -3,6 +3,7 @@ import useBivariateData from "../hooks/useBivariateData";
 import useChartExport from "../hooks/useChartExport";
 import Chart from 'chart.js/auto';
 import ChartControls from "./charts/ChartControls";
+import { getFormattedDate } from "../utils/chartExport";
 
 /**
  * Componente principal para visualizar datos bivariados usando gráficos de barras apiladas
@@ -30,6 +31,7 @@ export default function BivariateChart({
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [chartInstance, setChartInstance] = useState(null);
   const chartRef = useRef(null);
+  const localChartContainer = useRef(null);
   // State variables for chart display
   const [aspectRatio, setAspectRatio] = useState(windowWidth < 640 ? 1.2 : 1.6);
   const [showLegend, setShowLegend] = useState(true);
@@ -51,8 +53,9 @@ export default function BivariateChart({
 
   const {
     exporting,
-    chartContainerRef,
-    handleExportChart,
+    setExporting,
+    chartInstanceRef,
+    exportChart,
     openInNewTab
   } = useChartExport();
 
@@ -153,11 +156,11 @@ export default function BivariateChart({
   
   // Toggle fullscreen mode
   const toggleFullscreen = () => {
-    if (!chartContainerRef.current) return;
+    if (!localChartContainer.current) return;
     
     if (!isFullscreen) {
-      if (chartContainerRef.current.requestFullscreen) {
-        chartContainerRef.current.requestFullscreen();
+      if (localChartContainer.current.requestFullscreen) {
+        localChartContainer.current.requestFullscreen();
       }
     } else {
       if (document.exitFullscreen) {
@@ -169,7 +172,7 @@ export default function BivariateChart({
   // Listen for fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isFS = document.fullscreenElement === chartContainerRef.current;
+      const isFS = document.fullscreenElement === localChartContainer.current;
       setIsFullscreen(isFS);
     };
     
@@ -358,18 +361,52 @@ export default function BivariateChart({
     };
   };
 
+  // Link the chart instance ref with our hook's ref
+  useEffect(() => {
+    if (chartInstance) {
+      chartInstanceRef.current = chartInstance;
+    }
+  }, [chartInstance, chartInstanceRef]);
+
+  // Handle chart export with proper chart rendering preparation
+  const handleChartExport = async (format = 'png') => {
+    if (!chartInstance) {
+      console.error("No chart instance available for export");
+      return;
+    }
+    
+    try {
+      // Create a filename with the variables and date
+      const date = getFormattedDate();
+      const filename = `${variable1}_${variable2}_chart_${date}`;
+      
+      // Enhanced export options
+      const exportOptions = {
+        chartInstance: chartInstance,
+        filename: filename,
+        format: format,
+        title: `${variable1Title} × ${variable2Title}`,
+        subtitle: `Modo: ${localViewMode === 'absolute' ? 'Absoluto' : 'Relativo'}`,
+        footnote: `Generado el ${date}`,
+        darkMode: darkMode,
+        // Include legend items
+        legendItems: chartInstance.data.datasets.map(dataset => ({
+          text: dataset.label,
+          color: dataset.backgroundColor
+        }))
+      };
+      
+      // Call the export function with the enhanced options
+      await exportChart(exportOptions);
+    } catch (error) {
+      console.error('Error exporting chart:', error);
+    }
+  };
+
   // Handler para exportar el gráfico
   const onExportChart = () => {
-    handleExportChart({
-      variable1Title,
-      variable2Title,
-      chartType: 'stacked',
-      viewMode: localViewMode,
-      darkMode,
-      excludedValues1: excludedValues1.length,
-      excludedValues2: excludedValues2.length,
-      format: downloadFormat // Pass the selected format
-    });
+    // Use the enhanced handleChartExport function with the selected format
+    handleChartExport(downloadFormat);
   };
 
   // Handler para abrir en nueva pestaña
@@ -447,7 +484,7 @@ export default function BivariateChart({
         )}
         
         <div 
-          ref={chartContainerRef}
+          ref={localChartContainer}
           className={`relative overflow-hidden rounded-lg ${
             isFullscreen 
               ? 'bg-black w-screen h-screen flex items-center justify-center' 
