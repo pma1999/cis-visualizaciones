@@ -40,7 +40,9 @@ try:
         get_active_data_file,
         set_active_data_file,
         upload_file,
-        delete_file
+        delete_file,
+        check_variables_in_file,
+        find_files_with_variables
     )
 except ImportError:
     # Fallback for Railway deployment
@@ -77,7 +79,9 @@ except ImportError:
         get_active_data_file,
         set_active_data_file,
         upload_file,
-        delete_file
+        delete_file,
+        check_variables_in_file,
+        find_files_with_variables
     )
 
 # Create FastAPI application
