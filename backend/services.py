@@ -329,3 +329,133 @@ def obtener_contingencia(variable1: str, variable2: str) -> Dict[str, Any]:
         logger.error(f"Error in contingency analysis: {str(e)}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise
+
+def check_variables_in_file(filename: str, variables: List[str], is_local: bool = False) -> Dict[str, Any]:
+    """Check if variables exist in a specific file without changing the active file.
+    
+    Args:
+        filename: Name of the file to check
+        variables: List of variable codes to check
+        is_local: Whether the file is stored locally
+        
+    Returns:
+        Dict with information about variable existence
+    """
+    try:
+        if is_local:
+            # For local files, client-side verification is needed
+            return {
+                "error": "La verificación de variables en archivos locales debe realizarse en el cliente"
+            }
+        
+        # Get file path
+        file_path = os.path.join(DATA_DIRECTORY, filename)
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            logger.warning(f"File not found: {file_path}")
+            return {
+                "exists": False,
+                "message": f"El archivo {filename} no existe en el sistema"
+            }
+        
+        # Load dataset without changing global active file
+        try:
+            df, meta = pyreadstat.read_sav(file_path)
+            
+            # Check if variables exist in the file
+            available_vars = df.columns.tolist()
+            
+            # Create result dictionary
+            result = {
+                "exists": True,
+                "variables": {}
+            }
+            
+            # Check each variable
+            for var in variables:
+                var_exists = var in available_vars
+                result["variables"][var] = {
+                    "exists": var_exists,
+                    "label": meta.column_labels[meta.column_names.index(var)] if var_exists else None
+                }
+            
+            # Check if all variables exist
+            result["all_exist"] = all(result["variables"][var]["exists"] for var in variables)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error checking variables in file {filename}: {str(e)}")
+            return {
+                "exists": True,
+                "all_exist": False,
+                "error": f"Error al leer el archivo: {str(e)}"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in check_variables_in_file: {str(e)}")
+        return {
+            "error": f"Error al verificar variables: {str(e)}"
+        }
+
+def find_files_with_variables(variables: List[str]) -> Dict[str, Any]:
+    """Find which files contain all the specified variables.
+    
+    Args:
+        variables: List of variable codes to check
+        
+    Returns:
+        Dict with information about files containing the variables
+    """
+    try:
+        # Get list of all available files
+        files_data = list_available_files()
+        
+        # Result dictionary
+        result = {
+            "compatible_files": [],
+            "partially_compatible": []
+        }
+        
+        # Check each file
+        for file_info in files_data:
+            filename = file_info["name"]
+            
+            # Check if variables exist in this file
+            var_check = check_variables_in_file(filename, variables)
+            
+            if var_check.get("error"):
+                continue
+                
+            # If all variables exist, add to compatible files
+            if var_check.get("all_exist", False):
+                result["compatible_files"].append({
+                    "filename": filename,
+                    "friendly_name": file_info.get("friendly_name", filename),
+                    "is_active": file_info.get("active", False)
+                })
+            else:
+                # If some variables exist, add to partially compatible
+                existing_vars = [v for v in variables if var_check.get("variables", {}).get(v, {}).get("exists", False)]
+                if existing_vars:
+                    result["partially_compatible"].append({
+                        "filename": filename,
+                        "friendly_name": file_info.get("friendly_name", filename),
+                        "existing_variables": existing_vars,
+                        "is_active": file_info.get("active", False)
+                    })
+        
+        # Set found flag
+        result["found_compatible"] = len(result["compatible_files"]) > 0
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in find_files_with_variables: {str(e)}")
+        return {
+            "error": f"Error al buscar archivos compatibles: {str(e)}",
+            "compatible_files": [],
+            "partially_compatible": [],
+            "found_compatible": False
+        }

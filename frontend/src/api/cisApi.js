@@ -333,6 +333,210 @@ export async function getContingencia(variable1, variable2) {
 }
 
 /**
+ * Check if variables exist in a specific file
+ * @param {string} filename - Name of the file to check
+ * @param {string[]} variables - List of variable codes to check
+ * @param {boolean} isLocal - Whether the file is stored locally
+ * @returns {Promise<Object>} Result with variable existence information
+ */
+export async function checkVariablesInFile(filename, variables, isLocal = false) {
+  try {
+    if (isLocal) {
+      // For local files, we need to handle this client-side
+      // Get the local file
+      const localFile = await getLocalFile(filename);
+      if (!localFile) {
+        return { 
+          exists: false, 
+          message: `El archivo local ${filename} no existe` 
+        };
+      }
+      
+      // Since we can't access the variables in a local file directly,
+      // we'll return a simplified response
+      return { 
+        exists: true,
+        all_exist: false, // We can't know for sure
+        variables: variables.reduce((acc, v) => {
+          acc[v] = { exists: false, label: null };
+          return acc;
+        }, {}),
+        message: "La verificación de variables en archivos locales no es posible"
+      };
+    }
+    
+    // For server files, call the API
+    const queryParams = new URLSearchParams({
+      filename,
+      variables: variables.join(','),
+      is_local: isLocal
+    }).toString();
+    
+    const data = await fetchWithErrorHandling(`${API_URL}/check-variables?${queryParams}`);
+    return data;
+  } catch (error) {
+    console.error("Error checking variables in file:", error);
+    return { 
+      error: error.message || "Error al verificar variables",
+      exists: false,
+      all_exist: false
+    };
+  }
+}
+
+/**
+ * Find files that contain specific variables
+ * @param {string[]} variables - List of variable codes to find
+ * @returns {Promise<Object>} Result with files containing the variables
+ */
+export async function findFilesWithVariables(variables) {
+  try {
+    const queryParams = new URLSearchParams({
+      variables: variables.join(',')
+    }).toString();
+    
+    const data = await fetchWithErrorHandling(`${API_URL}/find-files-with-variables?${queryParams}`);
+    return data;
+  } catch (error) {
+    console.error("Error finding files with variables:", error);
+    return { 
+      error: error.message || "Error al buscar archivos compatibles",
+      compatible_files: [],
+      partially_compatible: [],
+      found_compatible: false
+    };
+  }
+}
+
+/**
+ * Get distribution for a variable from a specific file without changing active file
+ * @param {string} variable - Variable code
+ * @param {string} filename - Name of the file to use
+ * @param {boolean} isLocal - Whether the file is stored locally
+ * @returns {Promise<Object>} Distribution data
+ */
+export async function getDistribucionFromFile(variable, filename, isLocal = false) {
+  try {
+    if (isLocal) {
+      // For local files, we need to temporarily switch active file
+      const originalFile = localStorage.getItem('cis_active_file');
+      
+      try {
+        // Set file as active
+        await activateFile(filename, true);
+        
+        // Get distribution from now-active file
+        const distribution = await getDistribucion(variable);
+        return distribution;
+      } finally {
+        // Restore original file
+        if (originalFile) {
+          await activateFile(originalFile, true);
+        }
+      }
+    }
+    
+    // For server files, call the API
+    const url = `${API_URL}/distribucion/${encodeURIComponent(variable)}/file/${encodeURIComponent(filename)}?is_local=${isLocal}`;
+    const data = await fetchWithErrorHandling(url);
+    
+    if (data.error) {
+      console.error("Backend returned error:", data.error);
+      throw new Error(data.error);
+    }
+    
+    return data.distribucion;
+  } catch (error) {
+    console.error(`Error getting distribution for ${variable} from file ${filename}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get contingency table for two variables from a specific file without changing active file
+ * @param {string} variable1 - First variable code
+ * @param {string} variable2 - Second variable code
+ * @param {string} filename - Name of the file to use
+ * @param {boolean} isLocal - Whether the file is stored locally
+ * @returns {Promise<Object>} Contingency table data
+ */
+export async function getContingenciaFromFile(variable1, variable2, filename, isLocal = false) {
+  try {
+    if (isLocal) {
+      // For local files, we need to temporarily switch active file
+      const originalFile = localStorage.getItem('cis_active_file');
+      
+      try {
+        // Set file as active
+        await activateFile(filename, true);
+        
+        // Get contingency from now-active file
+        const contingency = await getContingencia(variable1, variable2);
+        return contingency;
+      } finally {
+        // Restore original file
+        if (originalFile) {
+          await activateFile(originalFile, true);
+        }
+      }
+    }
+    
+    // For server files, call the API
+    const url = `${API_URL}/contingencia/${encodeURIComponent(variable1)}/${encodeURIComponent(variable2)}/file/${encodeURIComponent(filename)}?is_local=${isLocal}`;
+    const data = await fetchWithErrorHandling(url);
+    
+    if (data.error) {
+      console.error("Backend returned error:", data.error);
+      throw new Error(data.error);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error(`Error getting contingency for ${variable1} and ${variable2} from file ${filename}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get information about the active file
+ * @returns {Promise<Object>} Information about active file
+ */
+export async function getActiveFileInfo() {
+  try {
+    const filesData = await getAvailableFiles();
+    
+    const activeFileName = filesData.active_file;
+    let activeFile = null;
+    let isLocal = false;
+    
+    // Check if active file is local
+    const localFiles = filesData.files.filter(f => f.is_local);
+    const activeLocalFile = localFiles.find(f => f.name === activeFileName);
+    
+    if (activeLocalFile) {
+      activeFile = activeLocalFile;
+      isLocal = true;
+    } else {
+      // Check in server files
+      const serverFiles = filesData.files.filter(f => !f.is_local);
+      const activeServerFile = serverFiles.find(f => f.name === activeFileName);
+      if (activeServerFile) {
+        activeFile = activeServerFile;
+      }
+    }
+    
+    return {
+      filename: activeFileName,
+      fileInfo: activeFile,
+      isLocal
+    };
+  } catch (error) {
+    console.error("Error getting active file info:", error);
+    return { error: error.message || "Error al obtener información del archivo activo" };
+  }
+}
+
+/**
  * Get all available data files
  * @returns {Promise<Object>} List of available files and active file
  */

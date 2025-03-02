@@ -3,6 +3,8 @@ import { getDistribucion } from "../api/cisApi";
 import { API_URL } from "../api/cisApi";
 import Chart from 'chart.js/auto';
 import { exportAsImage, getFormattedDate } from "../utils/chartExport";
+import ChartControls from "./charts/ChartControls";
+import useChartExport from "../hooks/useChartExport";
 
 export default function ChartComponent({ 
   variable, 
@@ -24,7 +26,7 @@ export default function ChartComponent({
   const [zoom, setZoom] = useState(initialZoom);
   const [showLegend, setShowLegend] = useState(initialShowLegend);
   const [downloadFormat, setDownloadFormat] = useState('png');
-  const [exporting, setExporting] = useState(false);
+  const [totalExcluded, setTotalExcluded] = useState(0);
   const [chartOptions, setChartOptions] = useState({
     animation: true,
     responsive: true,
@@ -34,19 +36,27 @@ export default function ChartComponent({
   const chartRef = useRef(null);
   const chartContainer = useRef(null);
 
+  // Use the export hook
+  const { 
+    exporting,
+    chartContainerRef,
+    handleExportChart,
+    openInNewTab: openChartInNewTab
+  } = useChartExport();
+
   // Function to open chart in new tab
   const openInNewTab = () => {
-    const baseUrl = window.location.origin;
-    const excludedValuesParam = excludedValues.length > 0 ? `&excludedValues1=${excludedValues.join(',')}` : '';
-    
-    // Include additional chart configuration parameters
-    const zoomParam = zoom !== 100 ? `&zoom=${zoom}` : '';
-    const aspectRatioParam = chartOptions.aspectRatio !== 1.6 ? `&aspectRatio=${chartOptions.aspectRatio}` : '';
-    const legendParam = `&showLegend=${showLegend}`;
-    
-    const url = `${baseUrl}/chart/univariate/${variable}?chartType=${chartType}&sortOrder=${sortOrder}${excludedValuesParam}&darkMode=${darkMode}${zoomParam}${aspectRatioParam}${legendParam}`;
-    
-    window.open(url, '_blank');
+    // Instead of manually building the URL, use the hook function for consistency
+    openChartInNewTab({
+      variable1: variable,
+      chartType: chartType,
+      sortOrder: sortOrder,
+      excludedValues1: excludedValues,
+      darkMode: darkMode,
+      zoom: zoom,
+      aspectRatio: chartOptions.aspectRatio,
+      showLegend: showLegend
+    });
   };
 
   useEffect(() => {
@@ -312,7 +322,7 @@ export default function ChartComponent({
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Usar la función avanzada de exportación
-      const success = await exportAsImage(chartContainer, filename, options);
+      const success = await handleExportChart(chartContainer, filename, options);
       
       if (!success) {
         throw new Error("No se pudo exportar el gráfico");

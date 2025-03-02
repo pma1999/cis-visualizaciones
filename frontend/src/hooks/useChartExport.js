@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { exportAsImage, getFormattedDate } from '../utils/chartExport';
+import { getActiveFileInfo } from '../api/cisApi';
 
 /**
  * Hook para manejar la exportación de gráficos como imágenes
@@ -9,6 +10,23 @@ import { exportAsImage, getFormattedDate } from '../utils/chartExport';
 const useChartExport = () => {
   const [exporting, setExporting] = useState(false);
   const chartContainerRef = useRef(null);
+  const [activeFile, setActiveFile] = useState(null);
+  
+  // Fetch active file information on mount
+  useEffect(() => {
+    async function fetchActiveFile() {
+      try {
+        const fileInfo = await getActiveFileInfo();
+        if (!fileInfo.error) {
+          setActiveFile(fileInfo);
+        }
+      } catch (error) {
+        console.error("Error fetching active file info:", error);
+      }
+    }
+    
+    fetchActiveFile();
+  }, []);
 
   /**
    * Exporta el gráfico actual como imagen
@@ -91,6 +109,8 @@ const useChartExport = () => {
    * @param {boolean} chartInfo.darkMode - Si se está usando el modo oscuro
    * @param {string[]} chartInfo.excludedValues1 - Valores excluidos de la primera variable
    * @param {string[]} chartInfo.excludedValues2 - Valores excluidos de la segunda variable
+   * @param {string} chartInfo.file - Nombre del archivo específico para usar (opcional)
+   * @param {boolean} chartInfo.isLocalFile - Si el archivo es local (opcional)
    */
   const openInNewTab = ({ 
     variable1, 
@@ -99,13 +119,36 @@ const useChartExport = () => {
     viewMode = 'absolute', 
     darkMode = false, 
     excludedValues1 = [], 
-    excludedValues2 = [] 
+    excludedValues2 = [],
+    file = null,
+    isLocalFile = null
   }) => {
     const baseUrl = window.location.origin;
     const excludedValues1Param = excludedValues1.length > 0 ? `&excludedValues1=${excludedValues1.join(',')}` : '';
     const excludedValues2Param = excludedValues2.length > 0 ? `&excludedValues2=${excludedValues2.join(',')}` : '';
     
-    const url = `${baseUrl}/chart/bivariate/${variable1}/${variable2}?chartType=${chartType}${excludedValues1Param}${excludedValues2Param}&darkMode=${darkMode}&viewMode=${viewMode}`;
+    // Include file information in the URL
+    let fileParam = '';
+    let fileTypeParam = '';
+    
+    // Use provided file info or active file info
+    if (file) {
+      fileParam = `&file=${encodeURIComponent(file)}`;
+      fileTypeParam = `&fileType=${isLocalFile ? 'local' : 'shared'}`;
+    } else if (activeFile && activeFile.filename) {
+      fileParam = `&file=${encodeURIComponent(activeFile.filename)}`;
+      fileTypeParam = `&fileType=${activeFile.isLocal ? 'local' : 'shared'}`;
+    }
+    
+    // Create URL based on chart type (univariate or bivariate)
+    let url;
+    if (variable2) {
+      // Bivariate chart
+      url = `${baseUrl}/chart/bivariate/${variable1}/${variable2}?chartType=${chartType}${excludedValues1Param}${excludedValues2Param}&darkMode=${darkMode}&viewMode=${viewMode}${fileParam}${fileTypeParam}`;
+    } else {
+      // Univariate chart
+      url = `${baseUrl}/chart/univariate/${variable1}?chartType=${chartType}${excludedValues1Param}&darkMode=${darkMode}${fileParam}${fileTypeParam}`;
+    }
     
     window.open(url, '_blank');
   };
@@ -114,7 +157,8 @@ const useChartExport = () => {
     exporting,
     chartContainerRef,
     handleExportChart,
-    openInNewTab
+    openInNewTab,
+    activeFile
   };
 };
 

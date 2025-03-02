@@ -195,6 +195,43 @@ def obtener_distribucion_variable(variable: str):
         logger.error(f"Error in /distribucion/{variable}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener la distribución para {variable}")
 
+@app.get("/distribucion/{variable}/file/{filename}")
+def obtener_distribucion_en_archivo(variable: str, filename: str, is_local: bool = False):
+    """Get frequency distribution for a variable in a specific file without changing active file."""
+    try:
+        # First check if variables exist in the file
+        check_result = check_variables_in_file(filename, [variable], is_local)
+        
+        if "error" in check_result:
+            raise HTTPException(status_code=400, detail=check_result["error"])
+            
+        if not check_result.get("exists", False):
+            raise HTTPException(status_code=404, detail=f"El archivo {filename} no existe")
+            
+        if not check_result.get("variables", {}).get(variable, {}).get("exists", False):
+            raise HTTPException(status_code=404, detail=f"La variable {variable} no existe en el archivo {filename}")
+        
+        # Temporarily set the active file
+        original_file = get_active_data_file()
+        set_active_data_file(filename)
+        
+        try:
+            # Get distribution
+            distribucion = obtener_distribucion(variable)
+            if isinstance(distribucion, dict) and "error" in distribucion:
+                raise HTTPException(status_code=404, detail=distribucion["error"])
+        finally:
+            # Restore original file
+            set_active_data_file(original_file)
+            
+        return {"distribucion": distribucion, "filename": filename}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in /distribucion/{variable}/file/{filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener la distribución para {variable} en el archivo {filename}")
+
 @app.get("/metadatos")
 def obtener_metadatos_api():
     """Get metadata for all variables."""
@@ -217,6 +254,97 @@ def obtener_contingencia_variables(variable1: str, variable2: str):
     except Exception as e:
         logger.error(f"Error in /contingencia/{variable1}/{variable2}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener la tabla de contingencia para {variable1} y {variable2}")
+
+@app.get("/contingencia/{variable1}/{variable2}/file/{filename}")
+def obtener_contingencia_en_archivo(variable1: str, variable2: str, filename: str, is_local: bool = False):
+    """Get contingency table for two variables in a specific file without changing active file."""
+    try:
+        # First check if variables exist in the file
+        check_result = check_variables_in_file(filename, [variable1, variable2], is_local)
+        
+        if "error" in check_result:
+            raise HTTPException(status_code=400, detail=check_result["error"])
+            
+        if not check_result.get("exists", False):
+            raise HTTPException(status_code=404, detail=f"El archivo {filename} no existe")
+            
+        if not check_result.get("variables", {}).get(variable1, {}).get("exists", False):
+            raise HTTPException(status_code=404, detail=f"La variable {variable1} no existe en el archivo {filename}")
+            
+        if not check_result.get("variables", {}).get(variable2, {}).get("exists", False):
+            raise HTTPException(status_code=404, detail=f"La variable {variable2} no existe en el archivo {filename}")
+        
+        # Temporarily set the active file
+        original_file = get_active_data_file()
+        set_active_data_file(filename)
+        
+        try:
+            # Get contingency table
+            result = obtener_contingencia(variable1, variable2)
+            if isinstance(result, dict) and "error" in result:
+                raise HTTPException(status_code=404, detail=result["error"])
+        finally:
+            # Restore original file
+            set_active_data_file(original_file)
+            
+        return {**result, "filename": filename}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in /contingencia/{variable1}/{variable2}/file/{filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener la tabla de contingencia para {variable1} y {variable2} en el archivo {filename}")
+
+# Add these new endpoints for variable checking
+@app.get("/check-variables")
+def check_variables_endpoint(filename: str, variables: str, is_local: bool = False):
+    """Check if variables exist in a specific file.
+    
+    Query parameters:
+    - filename: Name of the file to check
+    - variables: Comma-separated list of variable codes
+    - is_local: Whether the file is stored locally (default: false)
+    """
+    try:
+        # Parse variables
+        variables_list = variables.split(",")
+        
+        # Check variables in file
+        result = check_variables_in_file(filename, variables_list, is_local)
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+            
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in /check-variables: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al verificar variables: {str(e)}")
+
+@app.get("/find-files-with-variables")
+def find_files_with_variables_endpoint(variables: str):
+    """Find files that contain specific variables.
+    
+    Query parameters:
+    - variables: Comma-separated list of variable codes
+    """
+    try:
+        # Parse variables
+        variables_list = variables.split(",")
+        
+        # Find files with variables
+        result = find_files_with_variables(variables_list)
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+            
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in /find-files-with-variables: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al buscar archivos: {str(e)}")
 
 # Nuevas rutas para gestión de archivos
 @app.get("/files")

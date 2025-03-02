@@ -2,12 +2,23 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
 import ChartComponent from "./ChartComponent";
 import BivariateChart from "./BivariateChart";
-import { getVariables } from "../api/cisApi";
+import { 
+  getVariables, 
+  checkVariablesInFile, 
+  findFilesWithVariables, 
+  activateFile, 
+  getActiveFileInfo 
+} from "../api/cisApi";
 
 export default function FullscreenChartPage() {
   const { type, variable1, variable2 } = useParams();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
+  
+  // Get file information from URL
+  const fileParam = searchParams.get("file");
+  const fileTypeParam = searchParams.get("fileType") || "shared";
+  const isLocalFileParam = fileTypeParam === "local";
   
   // Determine the actual chart type from the URL path
   // If it contains 'bivariate' in the path, it's a bivariate chart, otherwise univariate
@@ -34,55 +45,272 @@ export default function FullscreenChartPage() {
     var2: null,
   });
   
+  // File and compatibility states
+  const [activeFile, setActiveFile] = useState(null);
+  const [fileFromUrl, setFileFromUrl] = useState(null);
+  const [compatibleFiles, setCompatibleFiles] = useState([]);
+  const [fileStatus, setFileStatus] = useState({
+    isFileSwitch: false,
+    isFileCompatible: true,
+    isPending: false,
+    message: null,
+    showSwitchPrompt: false
+  });
+  
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Fetch variable metadata
+  // First, check active file and URL file
   useEffect(() => {
-    async function fetchVariableData() {
+    async function checkFileStatus() {
       try {
-        setIsLoading(true);
-        const variables = await getVariables();
+        // Get current active file
+        const activeFileInfo = await getActiveFileInfo();
+        setActiveFile(activeFileInfo);
         
-        if (variables && variable1) {
-          // Create variable object with code and label
-          // Since 'variables' is an object of format { code: label, ... }
-          const var1Data = variables[variable1] ? {
-            code: variable1,
-            label: variables[variable1]
-          } : null;
-          
-          const var2Data = variable2 && variables[variable2] ? {
-            code: variable2,
-            label: variables[variable2]
-          } : null;
-          
-          if (!var1Data) {
-            throw new Error(`Variable ${variable1} no encontrada`);
-          }
-          
-          if (actualChartType === "bivariate" && variable2 && !var2Data) {
-            throw new Error(`Variable ${variable2} no encontrada`);
-          }
-          
-          setVariableData({
-            var1: var1Data,
-            var2: var2Data
+        // If URL has no file parameter, just continue
+        if (!fileParam) {
+          return;
+        }
+        
+        // Check if URL file is different from active file
+        const isSameFile = activeFileInfo && 
+          activeFileInfo.filename === fileParam &&
+          activeFileInfo.isLocal === isLocalFileParam;
+        
+        // If it's the same file, no action needed
+        if (isSameFile) {
+          return;
+        }
+        
+        // File is different, need to check if variables exist in current file
+        const variablesToCheck = [variable1];
+        if (variable2) {
+          variablesToCheck.push(variable2);
+        }
+        
+        // Set pending status
+        setFileStatus(prev => ({
+          ...prev,
+          isPending: true,
+          isFileSwitch: true,
+          message: "Comprobando compatibilidad de variables..."
+        }));
+        
+        // Check variables in current file
+        const varCheck = await checkVariablesInFile(
+          activeFileInfo.filename,
+          variablesToCheck,
+          activeFileInfo.isLocal
+        );
+        
+        // Variables exist in current file, no need to switch
+        if (varCheck.all_exist) {
+          setFileStatus(prev => ({
+            ...prev,
+            isPending: false,
+            isFileSwitch: false,
+            message: null
+          }));
+          return;
+        }
+        
+        // Variables don't exist in current file, check if they exist in requested file
+        const urlFileCheck = await checkVariablesInFile(
+          fileParam,
+          variablesToCheck,
+          isLocalFileParam
+        );
+        
+        // If URL file exists and has all variables
+        if (urlFileCheck.exists && urlFileCheck.all_exist) {
+          setFileFromUrl({
+            filename: fileParam,
+            isLocal: isLocalFileParam
           });
+          
+          // Show file switch prompt
+          setFileStatus(prev => ({
+            ...prev,
+            isPending: false,
+            isFileSwitch: true,
+            isFileCompatible: true,
+            showSwitchPrompt: true,
+            message: `Este gráfico utiliza variables del archivo "${fileParam}". ¿Desea cambiar a este archivo?`
+          }));
         } else {
-          throw new Error("Parámetros de URL inválidos");
+          // URL file doesn't exist or doesn't have all variables
+          // Find files that contain these variables
+          const filesWithVars = await findFilesWithVariables(variablesToCheck);
+          setCompatibleFiles(filesWithVars.compatible_files || []);
+          
+          if (filesWithVars.found_compatible) {
+            setFileStatus(prev => ({
+              ...prev,
+              isPending: false,
+              isFileSwitch: true,
+              isFileCompatible: false,
+              message: `El archivo "${fileParam}" no está disponible o no contiene las variables necesarias.`
+            }));
+          } else {
+            setFileStatus(prev => ({
+              ...prev,
+              isPending: false,
+              isFileSwitch: true,
+              isFileCompatible: false,
+              message: `No se encontraron archivos que contengan todas las variables necesarias.`
+            }));
+            setError("No hay archivos compatibles con las variables del gráfico.");
+          }
         }
       } catch (err) {
-        console.error("Error al cargar datos de variables:", err);
-        setError(err.message || "Error al cargar datos");
-      } finally {
-        setIsLoading(false);
+        console.error("Error al comprobar estado del archivo:", err);
+        setFileStatus(prev => ({
+          ...prev,
+          isPending: false,
+          isFileSwitch: false,
+          message: null
+        }));
       }
     }
     
-    fetchVariableData();
-  }, [variable1, variable2, actualChartType]);
+    checkFileStatus();
+  }, [fileParam, isLocalFileParam, variable1, variable2]);
+  
+  // Handle file switching
+  const handleSwitchFile = async () => {
+    if (!fileFromUrl) return;
+    
+    try {
+      setIsLoading(true);
+      setFileStatus(prev => ({
+        ...prev,
+        isPending: true,
+        message: `Cambiando al archivo ${fileFromUrl.filename}...`
+      }));
+      
+      // Activate the file
+      await activateFile(fileFromUrl.filename, fileFromUrl.isLocal);
+      
+      // Update active file
+      const newActiveFile = await getActiveFileInfo();
+      setActiveFile(newActiveFile);
+      
+      // Reset file status
+      setFileStatus({
+        isFileSwitch: false,
+        isFileCompatible: true,
+        isPending: false,
+        message: null,
+        showSwitchPrompt: false
+      });
+      
+      // Fetch data with new active file
+      await fetchVariableData();
+    } catch (err) {
+      console.error("Error al cambiar de archivo:", err);
+      setError(`Error al cambiar al archivo ${fileFromUrl.filename}`);
+      setIsLoading(false);
+    }
+  };
+  
+  // Cancel file switching
+  const handleCancelSwitch = () => {
+    setFileStatus(prev => ({
+      ...prev,
+      showSwitchPrompt: false
+    }));
+    
+    // If there are no compatible files, show error
+    if (compatibleFiles.length === 0) {
+      setError("No hay archivos compatibles con las variables del gráfico.");
+    }
+  };
+  
+  // Switch to a compatible file from the list
+  const switchToCompatibleFile = async (file) => {
+    try {
+      setIsLoading(true);
+      setFileStatus(prev => ({
+        ...prev,
+        isPending: true,
+        message: `Cambiando al archivo ${file.filename}...`
+      }));
+      
+      // Activate the file
+      await activateFile(file.filename, false); // compatible files are shared
+      
+      // Update active file
+      const newActiveFile = await getActiveFileInfo();
+      setActiveFile(newActiveFile);
+      
+      // Reset file status
+      setFileStatus({
+        isFileSwitch: false,
+        isFileCompatible: true,
+        isPending: false,
+        message: null,
+        showSwitchPrompt: false
+      });
+      
+      // Fetch data with new active file
+      await fetchVariableData();
+    } catch (err) {
+      console.error("Error al cambiar de archivo:", err);
+      setError(`Error al cambiar al archivo ${file.filename}`);
+      setIsLoading(false);
+    }
+  };
+  
+  // Fetch variable metadata
+  const fetchVariableData = async () => {
+    try {
+      setIsLoading(true);
+      const variables = await getVariables();
+      
+      if (variables && variable1) {
+        // Create variable object with code and label
+        // Since 'variables' is an object of format { code: label, ... }
+        const var1Data = variables[variable1] ? {
+          code: variable1,
+          label: variables[variable1]
+        } : null;
+        
+        const var2Data = variable2 && variables[variable2] ? {
+          code: variable2,
+          label: variables[variable2]
+        } : null;
+        
+        if (!var1Data) {
+          throw new Error(`Variable ${variable1} no encontrada`);
+        }
+        
+        if (actualChartType === "bivariate" && variable2 && !var2Data) {
+          throw new Error(`Variable ${variable2} no encontrada`);
+        }
+        
+        setVariableData({
+          var1: var1Data,
+          var2: var2Data
+        });
+      } else {
+        throw new Error("Parámetros de URL inválidos");
+      }
+    } catch (err) {
+      console.error("Error al cargar datos de variables:", err);
+      setError(err.message || "Error al cargar datos");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Fetch variable data after file status is resolved
+  useEffect(() => {
+    if (!fileStatus.isPending && !fileStatus.showSwitchPrompt) {
+      fetchVariableData();
+    }
+  }, [fileStatus.isPending, fileStatus.showSwitchPrompt]);
   
   // Share functionality
   const [shareUrl, setShareUrl] = useState("");
@@ -117,12 +345,66 @@ export default function FullscreenChartPage() {
     }
   };
   
+  // Render file switch prompt
+  const renderFileSwitchPrompt = () => {
+    return (
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${chartConfig.darkMode ? "bg-gray-900/80" : "bg-black/50"}`}>
+        <div className={`max-w-md w-full rounded-lg shadow-xl ${chartConfig.darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"} p-6`}>
+          <h3 className="text-lg font-bold mb-2">Cambio de archivo</h3>
+          <p className="mb-4">{fileStatus.message}</p>
+          
+          <div className="flex justify-end space-x-3">
+            <button 
+              className={`px-4 py-2 rounded-md ${chartConfig.darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
+              onClick={handleCancelSwitch}
+            >
+              Cancelar
+            </button>
+            <button 
+              className={`px-4 py-2 rounded-md ${chartConfig.darkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white`}
+              onClick={handleSwitchFile}
+            >
+              Cambiar archivo
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render compatible files options
+  const renderCompatibleFiles = () => {
+    if (compatibleFiles.length === 0) return null;
+    
+    return (
+      <div className={`mb-6 ${chartConfig.darkMode ? "text-white" : "text-gray-900"}`}>
+        <h3 className="text-lg font-semibold mb-2">Archivos compatibles disponibles:</h3>
+        <div className="space-y-2">
+          {compatibleFiles.map(file => (
+            <div 
+              key={file.filename}
+              className={`p-3 rounded-lg ${chartConfig.darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} cursor-pointer transition-colors`}
+              onClick={() => switchToCompatibleFile(file)}
+            >
+              <div className="font-medium">{file.friendly_name || file.filename}</div>
+              {file.is_active && (
+                <span className={`text-xs px-2 py-0.5 rounded-full ${chartConfig.darkMode ? "bg-green-800 text-green-100" : "bg-green-100 text-green-800"}`}>
+                  Activo
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
   if (isLoading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${chartConfig.darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
         <div className="text-center">
           <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${chartConfig.darkMode ? "border-blue-400" : "border-blue-600"} mb-4 mx-auto`}></div>
-          <p className="text-lg">Cargando gráfico...</p>
+          <p className="text-lg">{fileStatus.message || "Cargando gráfico..."}</p>
         </div>
       </div>
     );
@@ -137,6 +419,9 @@ export default function FullscreenChartPage() {
           </svg>
           <h2 className="text-2xl font-bold mb-2">Error</h2>
           <p className="mb-6">{error}</p>
+          
+          {renderCompatibleFiles()}
+          
           <Link to="/analysis" className={`px-6 py-3 rounded-lg font-medium ${chartConfig.darkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white transition-colors`}>
             Volver al análisis
           </Link>
@@ -147,6 +432,9 @@ export default function FullscreenChartPage() {
   
   return (
     <div className={`min-h-screen ${chartConfig.darkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"}`}>
+      {/* File switch prompt */}
+      {fileStatus.showSwitchPrompt && renderFileSwitchPrompt()}
+      
       {/* Header with controls */}
       <header className={`fixed top-0 left-0 right-0 z-10 ${chartConfig.darkMode ? "bg-gray-800/90" : "bg-white/90"} backdrop-blur-sm shadow-md px-2 sm:px-4 py-2 sm:py-3`}>
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-y-2">
@@ -166,6 +454,11 @@ export default function FullscreenChartPage() {
               <span className={`ml-2 px-2 py-1 rounded-full ${chartConfig.darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"}`}>
                 {actualChartType === "univariate" ? chartConfig.chartType : "Barras apiladas"}
               </span>
+              {activeFile && activeFile.filename && (
+                <span className={`ml-2 px-2 py-1 rounded-full ${chartConfig.darkMode ? "bg-green-900/50 text-green-200" : "bg-green-100 text-green-800"}`} title={activeFile.isLocal ? "Archivo local" : "Archivo compartido"}>
+                  {activeFile.filename}
+                </span>
+              )}
             </div>
           </div>
           
@@ -313,6 +606,11 @@ export default function FullscreenChartPage() {
             )}
             {actualChartType === "bivariate" && chartConfig.excludedValues2.length > 0 && (
               <span>Valores excluidos (var2): {chartConfig.excludedValues2.length}</span>
+            )}
+            {activeFile && (
+              <span className="ml-2">
+                Archivo: {activeFile.filename} {activeFile.isLocal ? "(local)" : ""}
+              </span>
             )}
           </div>
         </div>
