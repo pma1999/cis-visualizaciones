@@ -1,9 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import useBivariateData from "../hooks/useBivariateData";
 import useChartExport from "../hooks/useChartExport";
 import Chart from 'chart.js/auto';
 import ChartControls from "./charts/ChartControls";
 import { getFormattedDate } from "../utils/chartExport";
+import useAvailableSpace from "../hooks/useAvailableSpace";
 
 /**
  * Componente principal para visualizar datos bivariados usando gráficos de barras apiladas
@@ -29,9 +30,14 @@ export default function BivariateChart({
   // Estado local para el modo de visualización
   const [localViewMode, setLocalViewMode] = useState(viewMode);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
   const [chartInstance, setChartInstance] = useState(null);
   const chartRef = useRef(null);
   const localChartContainer = useRef(null);
+  const chartWrapperRef = useRef(null);
+  const toolbarRef = useRef(null);
+  const containerRef = useRef(null);
+  const [toolbarHeight, setToolbarHeight] = useState(0);
   // State variables for chart display
   const [aspectRatio, setAspectRatio] = useState(windowWidth < 640 ? 1.2 : 1.6);
   const [showLegend, setShowLegend] = useState(true);
@@ -39,6 +45,26 @@ export default function BivariateChart({
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Add download format state
   const [downloadFormat, setDownloadFormat] = useState('png');
+  // Track chart height
+  const [chartHeight, setChartHeight] = useState(windowWidth < 640 ? 350 : 500);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const headerRef = useRef(null);
+  // Track whether portrait or landscape
+  const [isPortrait, setIsPortrait] = useState(
+    typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : true
+  );
+
+  // Use custom hook for available space calculation
+  const { availableHeight, calculateHeight } = useAvailableSpace({
+    containerRef,
+    headerRef,
+    toolbarRef, 
+    isFullscreenPage,
+    isFullscreen,
+    defaultHeight: windowWidth < 640 ? 350 : 500,
+    additionalOffset: 30, // Extra safety margin
+    minHeight: 250
+  });
 
   // Hooks personalizados
   const {
@@ -64,23 +90,143 @@ export default function BivariateChart({
     setLocalViewMode(viewMode);
   }, [viewMode]);
 
+  // Update chart height when available height changes
+  useEffect(() => {
+    if (availableHeight > 0) {
+      setChartHeight(availableHeight);
+      
+      // Also update chart if it exists
+      if (chartInstance) {
+        chartInstance.resize();
+      }
+    }
+  }, [availableHeight, chartInstance]);
+
   // Efecto para manejar el cambio de tamaño de ventana
   useEffect(() => {
     const handleResize = () => {
-      setWindowWidth(window.innerWidth);
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      setWindowWidth(width);
+      setWindowHeight(height);
+      setIsPortrait(height > width);
+      
+      // Trigger height calculation
+      calculateHeight();
+      
+      // Update toolbar measurement on resize as well
+      if (toolbarRef.current) {
+        const toolbarHeight = toolbarRef.current.getBoundingClientRect().height;
+        setToolbarHeight(toolbarHeight);
+      }
+      
+      // Measure header height if not in fullscreen
+      if (headerRef.current && !isFullscreenPage && !isFullscreen) {
+        const headerHeight = headerRef.current.getBoundingClientRect().height;
+        setHeaderHeight(headerHeight);
+      }
     };
 
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', () => {
+        // Small delay to ensure browser has updated layout after orientation change
+        setTimeout(handleResize, 150);
+      });
       handleResize();
     }
 
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('resize', handleResize);
+        window.removeEventListener('orientationchange', handleResize);
       }
     };
-  }, []);
+  }, [isFullscreenPage, isFullscreen, calculateHeight]);
+
+  // Observe toolbar height changes using ResizeObserver
+  useEffect(() => {
+    if (!toolbarRef.current) return;
+    
+    const updateToolbarHeight = () => {
+      if (toolbarRef.current) {
+        const height = toolbarRef.current.getBoundingClientRect().height;
+        setToolbarHeight(height);
+        // Recalculate available height after toolbar height changes
+        calculateHeight();
+      }
+    };
+    
+    // Call immediately for initial measurement
+    updateToolbarHeight();
+    
+    // Also update on orientation change which might affect layout
+    const handleOrientationChange = () => {
+      // Slight delay to ensure the browser has updated layout after orientation change
+      setTimeout(updateToolbarHeight, 150);
+    };
+    
+    // Set up ResizeObserver to track changes
+    let resizeObserver;
+    try {
+      resizeObserver = new ResizeObserver(() => {
+        updateToolbarHeight();
+      });
+      
+      resizeObserver.observe(toolbarRef.current);
+      window.addEventListener('orientationchange', handleOrientationChange);
+    } catch (error) {
+      console.warn('ResizeObserver not supported in this browser, falling back to static measurements');
+      // Fallback for browsers without ResizeObserver
+      updateToolbarHeight();
+      window.addEventListener('orientationchange', handleOrientationChange);
+    }
+    
+    return () => {
+      if (resizeObserver && toolbarRef.current) {
+        try {
+          resizeObserver.unobserve(toolbarRef.current);
+          resizeObserver.disconnect();
+        } catch (error) {
+          // Ignore errors on cleanup
+        }
+      }
+      window.removeEventListener('orientationchange', handleOrientationChange);
+    };
+  }, [calculateHeight]);
+
+  // Measure header height
+  useEffect(() => {
+    if (headerRef.current && !isFullscreenPage && !isFullscreen) {
+      const measureHeader = () => {
+        const height = headerRef.current.getBoundingClientRect().height;
+        setHeaderHeight(height);
+        calculateHeight();
+      };
+      
+      measureHeader();
+      
+      // Set up ResizeObserver for header as well
+      let headerObserver;
+      try {
+        headerObserver = new ResizeObserver(measureHeader);
+        headerObserver.observe(headerRef.current);
+      } catch (error) {
+        // Fallback for browsers without ResizeObserver
+      }
+      
+      return () => {
+        if (headerObserver && headerRef.current) {
+          try {
+            headerObserver.unobserve(headerRef.current);
+            headerObserver.disconnect();
+          } catch (error) {
+            // Ignore errors on cleanup
+          }
+        }
+      };
+    }
+  }, [isFullscreenPage, isFullscreen, calculateHeight]);
 
   // Create or update chart when data or settings change
   useEffect(() => {
@@ -105,7 +251,8 @@ export default function BivariateChart({
     excludedValues2,
     aspectRatio,
     zoom,
-    showLegend
+    showLegend,
+    chartHeight
   ]);
 
   // Adjust chart options based on zoom
@@ -174,13 +321,16 @@ export default function BivariateChart({
     const handleFullscreenChange = () => {
       const isFS = document.fullscreenElement === localChartContainer.current;
       setIsFullscreen(isFS);
+      
+      // Recalculate height after fullscreen change
+      setTimeout(calculateHeight, 100);
     };
     
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [calculateHeight]);
 
   // Preparar los datos según el tipo de gráfico
   const getChartData = () => {
@@ -220,12 +370,13 @@ export default function BivariateChart({
     // Create stacked bar chart configuration
     const chartConfig = createStackedBarConfig(chartData);
     
-    // Create new chart instance
-    const ctx = chartRef.current.getContext('2d');
-    const newChartInstance = new Chart(ctx, chartConfig);
-    setChartInstance(newChartInstance);
-    
-    return newChartInstance;
+    // Add small delay to ensure the layout is stable before rendering the chart
+    setTimeout(() => {
+      // Create new chart instance
+      const ctx = chartRef.current.getContext('2d');
+      const newChartInstance = new Chart(ctx, chartConfig);
+      setChartInstance(newChartInstance);
+    }, 0);
   };
 
   // Configuration for stacked bar chart
@@ -271,8 +422,12 @@ export default function BivariateChart({
       };
     });
     
-    // Calculate appropriate base aspect ratio based on screen width
-    const baseAspectRatio = windowWidth < 640 ? 1.2 : 1.6;
+    // Calculate appropriate base aspect ratio based on screen width and orientation
+    let baseAspectRatio = windowWidth < 640 ? 1.2 : 1.6;
+    // On mobile in portrait mode, reduce aspect ratio for better vertical space usage
+    if (windowWidth < 640 && isPortrait) {
+      baseAspectRatio = 0.8;
+    }
     
     return {
       type: 'bar',
@@ -282,8 +437,16 @@ export default function BivariateChart({
       },
       options: {
         responsive: true,
-        aspectRatio: aspectRatio * (100 / zoom), // Use aspectRatio state instead of hardcoded value
-        maintainAspectRatio: !isFullscreenPage, // Don't maintain aspect ratio in fullscreen mode
+        maintainAspectRatio: isFullscreenPage ? false : (isFullscreen ? false : true),
+        aspectRatio: baseAspectRatio * (100 / zoom),
+        layout: {
+          padding: {
+            top: 5,
+            right: 5,
+            bottom: 5,
+            left: 5
+          }
+        },
         plugins: {
           tooltip: {
             callbacks: {
@@ -443,8 +606,14 @@ export default function BivariateChart({
   if (!hasData) return null;
 
   return (
-    <div className={`${darkMode ? 'text-white' : 'text-gray-800'}`}>
-      <div className={`relative ${isFullscreenPage ? 'h-full' : ''}`}>
+    <div 
+      ref={containerRef}
+      className={`${darkMode ? 'text-white' : 'text-gray-800'}`}
+    >
+      <div 
+        ref={headerRef}
+        className={`${isFullscreenPage ? 'h-full' : ''}`}
+      >
         {/* Only show title when NOT in fullscreen page */}
         {!isFullscreenPage && (
           <h3 className="text-lg font-semibold mb-3">
@@ -467,18 +636,22 @@ export default function BivariateChart({
           className={`relative overflow-hidden rounded-lg ${
             isFullscreen 
               ? 'bg-black w-screen h-screen flex items-center justify-center' 
-              : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-2 sm:p-4 ${isFullscreenPage ? 'h-full' : 'h-[350px] sm:h-[500px]'}`
+              : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-2 sm:p-4`
           }`}
           style={{ 
-            minHeight: isFullscreenPage ? '100%' : undefined
+            minHeight: isFullscreenPage ? '100%' : '250px',
+            height: isFullscreenPage || isFullscreen ? '100%' : `${chartHeight}px`
           }}
         >
           {/* Controls container with absolute positioning - shown in all cases */}
-          <div className={`absolute top-0 left-0 right-0 z-10 px-2 py-2 sm:py-1.5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 border-b ${
-            isFullscreen || darkMode 
-              ? 'bg-black/30 backdrop-blur-sm border-gray-700/30' 
-              : 'bg-white/60 backdrop-blur-sm border-gray-200/50'
-          }`}>
+          <div 
+            ref={toolbarRef}
+            className={`absolute top-0 left-0 right-0 z-10 px-2 py-2 sm:py-1.5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 border-b shadow-sm ${
+              isFullscreen || darkMode 
+                ? 'bg-black/30 backdrop-blur-sm border-gray-700/30' 
+                : 'bg-white/70 backdrop-blur-sm border-gray-200/50'
+            }`}
+          >
             {/* Left side: View mode selector */}
             <div className="flex-shrink-0 w-full sm:w-auto mb-1 sm:mb-0">
               <select
@@ -534,14 +707,28 @@ export default function BivariateChart({
             </div>
           )}
           
-          <canvas 
-            ref={chartRef}
-            className="w-full h-full mt-14 sm:mt-9" /* More margin on mobile, less on larger screens */
+          {/* Container for chart with dynamic spacing from toolbar */}
+          <div 
+            ref={chartWrapperRef}
+            className="relative w-full h-full" 
             style={{ 
-              maxHeight: isFullscreen ? '95vh' : isFullscreenPage ? '100%' : undefined,
-              maxWidth: isFullscreen ? '95vw' : '100%'
+              paddingTop: `${Math.max(toolbarHeight + (windowWidth < 480 ? 12 : 8), windowWidth < 480 ? 70 : windowWidth < 640 ? 60 : 50)}px`,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
-          />
+          >
+            <canvas 
+              ref={chartRef}
+              className="w-full h-full"
+              style={{ 
+                maxHeight: isFullscreen ? '95vh' : isFullscreenPage ? '100%' : '100%',
+                maxWidth: isFullscreen ? '95vw' : '100%',
+                paddingTop: 0
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>

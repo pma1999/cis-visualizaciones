@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { getDistribucion } from "../api/cisApi";
 import { API_URL } from "../api/cisApi";
 import Chart from 'chart.js/auto';
 import { getFormattedDate } from "../utils/chartExport";
 import ChartControls from "./charts/ChartControls";
 import useChartExport from "../hooks/useChartExport";
+import useAvailableSpace from "../hooks/useAvailableSpace";
 
 export default function ChartComponent({ 
   variable, 
@@ -27,6 +28,13 @@ export default function ChartComponent({
   const [showLegend, setShowLegend] = useState(initialShowLegend);
   const [downloadFormat, setDownloadFormat] = useState('png');
   const [totalExcluded, setTotalExcluded] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
+  const [toolbarHeight, setToolbarHeight] = useState(0);
+  const [chartHeight, setChartHeight] = useState(windowWidth < 640 ? 350 : 500);
+  const [isPortrait, setIsPortrait] = useState(
+    typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : true
+  );
   const [chartOptions, setChartOptions] = useState({
     animation: true,
     responsive: true,
@@ -35,6 +43,22 @@ export default function ChartComponent({
   
   const chartRef = useRef(null);
   const chartContainer = useRef(null);
+  const toolbarRef = useRef(null);
+  const containerRef = useRef(null);
+  const headerRef = useRef(null);
+  const chartWrapperRef = useRef(null);
+
+  // Use custom hook for available space calculation
+  const { availableHeight, calculateHeight } = useAvailableSpace({
+    containerRef,
+    headerRef,
+    toolbarRef, 
+    isFullscreenPage,
+    isFullscreen,
+    defaultHeight: windowWidth < 640 ? 350 : 500,
+    additionalOffset: 30, // Extra safety margin
+    minHeight: 250
+  });
 
   // Use the export hook - now getting setExporting as well
   const { 
@@ -44,6 +68,18 @@ export default function ChartComponent({
     exportChart,
     openInNewTab: openChartInNewTab
   } = useChartExport();
+
+  // Update chart height when available height changes
+  useEffect(() => {
+    if (availableHeight > 0) {
+      setChartHeight(availableHeight);
+      
+      // Also update chart if it exists
+      if (chartInstance) {
+        chartInstance.resize();
+      }
+    }
+  }, [availableHeight, chartInstance]);
 
   // Function to open chart in new tab
   const openInNewTab = () => {
@@ -59,6 +95,130 @@ export default function ChartComponent({
       showLegend: showLegend
     });
   };
+
+  // Effect to handle window resizing
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      setWindowWidth(width);
+      setWindowHeight(height);
+      setIsPortrait(height > width);
+      
+      // Trigger height calculation
+      calculateHeight();
+      
+      // Update toolbar measurement on resize as well
+      if (toolbarRef.current) {
+        const toolbarHeight = toolbarRef.current.getBoundingClientRect().height;
+        setToolbarHeight(toolbarHeight);
+      }
+      
+      // Measure header height if not in fullscreen
+      if (headerRef.current && !isFullscreenPage && !isFullscreen) {
+        const headerHeight = headerRef.current.getBoundingClientRect().height;
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', () => {
+        // Small delay to ensure browser has updated layout after orientation change
+        setTimeout(handleResize, 150);
+      });
+      handleResize();
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('orientationchange', handleResize);
+      }
+    };
+  }, [isFullscreenPage, isFullscreen, calculateHeight]);
+
+  // Observe toolbar height changes using ResizeObserver
+  useEffect(() => {
+    if (!toolbarRef.current) return;
+    
+    const updateToolbarHeight = () => {
+      if (toolbarRef.current) {
+        const height = toolbarRef.current.getBoundingClientRect().height;
+        setToolbarHeight(height);
+        // Recalculate available height after toolbar height changes
+        calculateHeight();
+      }
+    };
+    
+    // Call immediately for initial measurement
+    updateToolbarHeight();
+    
+    // Also update on orientation change which might affect layout
+    const handleOrientationChange = () => {
+      // Slight delay to ensure the browser has updated layout after orientation change
+      setTimeout(updateToolbarHeight, 150);
+    };
+    
+    // Set up ResizeObserver to track changes
+    let resizeObserver;
+    try {
+      resizeObserver = new ResizeObserver(() => {
+        updateToolbarHeight();
+      });
+      
+      resizeObserver.observe(toolbarRef.current);
+      window.addEventListener('orientationchange', handleOrientationChange);
+    } catch (error) {
+      console.warn('ResizeObserver not supported in this browser, falling back to static measurements');
+      // Fallback for browsers without ResizeObserver
+      updateToolbarHeight();
+      window.addEventListener('orientationchange', handleOrientationChange);
+    }
+    
+    return () => {
+      if (resizeObserver && toolbarRef.current) {
+        try {
+          resizeObserver.unobserve(toolbarRef.current);
+          resizeObserver.disconnect();
+        } catch (error) {
+          // Ignore errors on cleanup
+        }
+      }
+      window.removeEventListener('orientationchange', handleOrientationChange);
+    };
+  }, [calculateHeight]);
+
+  // Measure header height
+  useEffect(() => {
+    if (headerRef.current && !isFullscreenPage && !isFullscreen) {
+      const measureHeader = () => {
+        const height = headerRef.current.getBoundingClientRect().height;
+        calculateHeight();
+      };
+      
+      measureHeader();
+      
+      // Set up ResizeObserver for header as well
+      let headerObserver;
+      try {
+        headerObserver = new ResizeObserver(measureHeader);
+        headerObserver.observe(headerRef.current);
+      } catch (error) {
+        // Fallback for browsers without ResizeObserver
+      }
+      
+      return () => {
+        if (headerObserver && headerRef.current) {
+          try {
+            headerObserver.unobserve(headerRef.current);
+            headerObserver.disconnect();
+          } catch (error) {
+            // Ignore errors on cleanup
+          }
+        }
+      };
+    }
+  }, [isFullscreenPage, isFullscreen, calculateHeight]);
 
   useEffect(() => {
     async function fetchData() {
@@ -126,7 +286,7 @@ export default function ChartComponent({
     const labels = processedData.map(([key]) => {
       const label = valueLabels[key] || key;
       // Acortar etiquetas muy largas
-      const maxLength = window.innerWidth < 640 ? 15 : 25;
+      const maxLength = windowWidth < 640 ? 15 : 25;
       return label.length > maxLength ? label.substring(0, maxLength - 3) + '...' : label;
     });
     
@@ -164,8 +324,12 @@ export default function ChartComponent({
     Chart.defaults.color = darkMode ? '#e5e7eb' : '#374151';
     Chart.defaults.borderColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     
-    // Calculate appropriate base aspect ratio based on screen width
-    const baseAspectRatio = window.innerWidth < 640 ? 1.2 : chartOptions.aspectRatio;
+    // Calculate appropriate base aspect ratio based on screen width and orientation
+    let baseAspectRatio = windowWidth < 640 ? 1.2 : chartOptions.aspectRatio;
+    // On mobile in portrait mode, reduce aspect ratio for better vertical space usage
+    if (windowWidth < 640 && isPortrait) {
+      baseAspectRatio = 0.8;
+    }
     
     // Definir los tipos de gráficos disponibles
     const chartConfig = {
@@ -186,7 +350,15 @@ export default function ChartComponent({
       options: {
         ...chartOptions,
         aspectRatio: baseAspectRatio,
-        maintainAspectRatio: !isFullscreenPage,
+        maintainAspectRatio: isFullscreenPage ? false : (isFullscreen ? false : true),
+        layout: {
+          padding: {
+            top: 5,
+            right: 5,
+            bottom: 5,
+            left: 5
+          }
+        },
         scales: {
           x: {
             grid: {
@@ -196,7 +368,7 @@ export default function ChartComponent({
               maxRotation: 45,
               minRotation: 0,
               font: {
-                size: window.innerWidth < 640 ? 10 : 12
+                size: windowWidth < 640 ? 10 : 12
               }
             }
           },
@@ -207,7 +379,7 @@ export default function ChartComponent({
             },
             ticks: {
               font: {
-                size: window.innerWidth < 640 ? 10 : 12
+                size: windowWidth < 640 ? 10 : 12
               }
             }
           }
@@ -218,9 +390,9 @@ export default function ChartComponent({
             position: 'bottom',
             labels: {
               boxWidth: 15,
-              padding: window.innerWidth < 640 ? 8 : 15,
+              padding: windowWidth < 640 ? 8 : 15,
               font: {
-                size: window.innerWidth < 640 ? 10 : 12
+                size: windowWidth < 640 ? 10 : 12
               }
             }
           },
@@ -254,31 +426,65 @@ export default function ChartComponent({
       chartConfig.options.aspectRatio = chartConfig.options.aspectRatio * (100 / zoom);
     }
     
-    const ctx = chartRef.current.getContext('2d');
-    const newChartInstance = new Chart(ctx, chartConfig);
-    
-    // Store the chart instance in both state and ref
-    setChartInstance(newChartInstance);
-    chartInstanceRef.current = newChartInstance;
+    // Add small delay to ensure the layout is stable before rendering the chart
+    setTimeout(() => {
+      const ctx = chartRef.current.getContext('2d');
+      const newChartInstance = new Chart(ctx, chartConfig);
+      
+      // Store the chart instance in both state and ref
+      setChartInstance(newChartInstance);
+      chartInstanceRef.current = newChartInstance;
+    }, 0);
     
     return () => {
-      if (newChartInstance) {
-        newChartInstance.destroy();
+      if (chartInstance) {
+        chartInstance.destroy();
       }
     };
-  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, zoom, showLegend, chartOptions]);
+  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, zoom, showLegend, chartOptions, windowWidth, isPortrait, chartHeight]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFS = document.fullscreenElement === chartContainer.current;
       setIsFullscreen(isFS);
+      
+      // Recalculate height after fullscreen change
+      setTimeout(calculateHeight, 100);
     };
     
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [calculateHeight]);
+
+  // Helper function to get human-readable chart type names
+  const getChartTypeName = (type) => {
+    const chartTypes = {
+      'bar': 'Barras',
+      'line': 'Líneas',
+      'pie': 'Pastel',
+      'doughnut': 'Anillo'
+    };
+    return chartTypes[type] || type;
+  };
+
+  // Add this function to ensure chart rendering for export
+  const prepareChartForExport = () => {
+    if (chartInstance) {
+      // Apply any pending animations or updates
+      chartInstance.update('none');
+      // Force render
+      chartInstance.render();
+    }
+  };
+
+  // Update the useEffect for exporting to include preparation
+  useEffect(() => {
+    if (exporting) {
+      prepareChartForExport();
+    }
+  }, [exporting]);
 
   // Enhanced chart export function
   const handleChartExport = async (format = 'png') => {
@@ -316,34 +522,6 @@ export default function ChartComponent({
       console.error('Error exporting chart:', error);
     }
   };
-
-  // Helper function to get human-readable chart type names
-  const getChartTypeName = (type) => {
-    const chartTypes = {
-      'bar': 'Barras',
-      'line': 'Líneas',
-      'pie': 'Pastel',
-      'doughnut': 'Anillo'
-    };
-    return chartTypes[type] || type;
-  };
-
-  // Add this function to ensure chart rendering for export
-  const prepareChartForExport = () => {
-    if (chartInstance) {
-      // Apply any pending animations or updates
-      chartInstance.update('none');
-      // Force render
-      chartInstance.render();
-    }
-  };
-
-  // Update the useEffect for exporting to include preparation
-  useEffect(() => {
-    if (exporting) {
-      prepareChartForExport();
-    }
-  }, [exporting]);
 
   const downloadChart = async () => {
     // Use the enhanced handleChartExport function with the selected format
@@ -393,36 +571,17 @@ export default function ChartComponent({
   }
 
   return (
-    <div className={`relative ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-      <div className={`absolute top-0 right-0 z-10 flex items-center space-x-1 p-1 ${isFullscreen ? 'bg-black/20 rounded-bl-lg backdrop-blur-sm' : ''}`}>
-        <div className="transition-opacity duration-200">
-          <select
-            className={`text-[10px] sm:text-xs p-0.5 sm:p-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
-            value={downloadFormat}
-            onChange={(e) => setDownloadFormat(e.target.value)}
-          >
-            <option value="png">PNG</option>
-            <option value="jpg">JPG</option>
-          </select>
+    <div 
+      ref={containerRef}
+      className={`relative ${darkMode ? 'text-white' : 'text-gray-800'}`}
+    >
+      {!isFullscreenPage && (
+        <div ref={headerRef}>
+          <h3 className="text-lg font-semibold mb-3">
+            {`Distribución de ${variable}`}
+          </h3>
         </div>
-        
-        <ChartControls 
-          exporting={exporting}
-          handleExportChart={downloadChart}
-          openInNewTab={openInNewTab}
-          isFullscreenPage={isFullscreenPage}
-          darkMode={darkMode}
-          zoom={zoom}
-          increaseZoom={increaseZoom}
-          decreaseZoom={decreaseZoom}
-          resetZoom={resetZoom}
-          showLegend={showLegend}
-          toggleLegend={() => setShowLegend(!showLegend)}
-          toggleAspectRatio={toggleAspectRatio}
-          toggleFullscreen={toggleFullscreen}
-          isFullscreen={isFullscreen}
-        />
-      </div>
+      )}
       
       <div 
         ref={chartContainer}
@@ -433,9 +592,67 @@ export default function ChartComponent({
         }`}
         style={{ 
           minHeight: isFullscreenPage ? '100%' : '250px',
-          height: isFullscreenPage ? '100%' : undefined
+          height: isFullscreenPage || isFullscreen ? '100%' : `${chartHeight}px`
         }}
       >
+        {/* Controls container with absolute positioning */}
+        <div 
+          ref={toolbarRef}
+          className={`absolute top-0 left-0 right-0 z-10 px-2 py-2 sm:py-1.5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 border-b shadow-sm ${
+            isFullscreen || darkMode 
+              ? 'bg-black/30 backdrop-blur-sm border-gray-700/30' 
+              : 'bg-white/70 backdrop-blur-sm border-gray-200/50'
+          }`}
+        >
+          {/* Chart type and download format selection */}
+          <div className="flex-shrink-0 w-full sm:w-auto mb-1 sm:mb-0">
+            <select
+              className={`text-xs p-1 rounded border w-full sm:w-auto min-w-[120px] ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
+              value={chartType}
+              onChange={(e) => window.location.href = `?variable=${variable}&chartType=${e.target.value}&sortOrder=${sortOrder}`}
+              aria-label="Tipo de gráfico"
+            >
+              <option value="bar">Barras</option>
+              <option value="line">Líneas</option>
+              <option value="pie">Circular</option>
+              <option value="doughnut">Anillo</option>
+            </select>
+          </div>
+          
+          {/* Right side controls */}
+          <div className="flex items-center gap-1">
+            <div className={`${windowWidth < 640 ? 'hidden sm:block' : ''}`}>
+              <select
+                className={`text-[10px] sm:text-xs p-0.5 sm:p-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
+                value={downloadFormat}
+                onChange={(e) => setDownloadFormat(e.target.value)}
+                aria-label="Formato de descarga"
+              >
+                <option value="png">PNG</option>
+                <option value="jpg">JPG</option>
+              </select>
+            </div>
+            
+            <ChartControls 
+              exporting={exporting}
+              handleExportChart={downloadChart}
+              openInNewTab={openInNewTab}
+              isFullscreenPage={isFullscreenPage}
+              darkMode={darkMode}
+              zoom={zoom}
+              increaseZoom={increaseZoom}
+              decreaseZoom={decreaseZoom}
+              resetZoom={resetZoom}
+              showLegend={showLegend}
+              toggleLegend={() => setShowLegend(!showLegend)}
+              toggleAspectRatio={toggleAspectRatio}
+              toggleFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+              hideViewModeSelector={true}
+            />
+          </div>
+        </div>
+        
         {loading ? (
           <div className={`flex flex-col items-center justify-center ${isFullscreen ? 'h-screen' : 'h-80'}`}>
             <div className={`animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 ${darkMode ? 'border-blue-400' : 'border-blue-500'} mb-4`}></div>
@@ -449,13 +666,31 @@ export default function ChartComponent({
             <p className="font-medium text-center">{error}</p>
           </div>
         ) : (
-          <div className={`${isFullscreen || isFullscreenPage ? 'p-2 sm:p-8 max-w-screen-xl mx-auto' : 'w-full'}`} style={{ height: isFullscreenPage ? '100%' : undefined }}>
+          <div 
+            ref={chartWrapperRef}
+            className="relative w-full h-full" 
+            style={{ 
+              paddingTop: `${Math.max(toolbarHeight + (windowWidth < 480 ? 12 : 8), windowWidth < 480 ? 70 : windowWidth < 640 ? 60 : 50)}px`,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             {zoom !== 100 && (
-              <div className={`absolute top-0 left-0 m-2 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+              <div className={`absolute bottom-0 left-0 m-2 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
                 {zoom}%
               </div>
             )}
-            <canvas ref={chartRef} className="w-full h-full"></canvas>
+            <canvas 
+              ref={chartRef} 
+              className="w-full h-full" 
+              style={{ 
+                paddingTop: 0,
+                maxHeight: isFullscreen ? '95vh' : isFullscreenPage ? '100%' : '100%',
+                maxWidth: isFullscreen ? '95vw' : '100%'
+              }}
+            />
           </div>
         )}
       </div>
