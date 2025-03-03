@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+/* Chart container styles */
+.chart-container {
+  position: relative;
+  width: 100%;
+  transition: height 0.3s ease;
+}
+
+/* Ensure canvas is properly sized */
+.chart-container canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+
+/* Prevent chart from growing indefinitely */
+.chart-container.overflow-hidden {
+  overflow: hidden;
+  contain: paint;
+}

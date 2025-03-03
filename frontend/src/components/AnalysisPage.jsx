@@ -480,13 +480,15 @@ export default function AnalysisPage() {
                       <div className={`${activeTab === 'chart' ? 'block' : 'hidden'} md:block`}>
                         <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-4`}>
                           <h4 className="font-medium mb-3">Gráfico</h4>
-                          <ChartComponent 
-                            variable={selectedVariable.code} 
-                            chartType={chartType} 
-                            sortOrder={sortOrder} 
-                            excludedValues={excludedPrimaryValues}
-                            darkMode={darkMode}
-                          />
+                          <div className="overflow-hidden chart-container" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+                            <ChartComponent 
+                              variable={selectedVariable.code} 
+                              chartType={chartType} 
+                              sortOrder={sortOrder} 
+                              excludedValues={excludedPrimaryValues}
+                              darkMode={darkMode}
+                            />
+                          </div>
                         </div>
                       </div>
                     </>
@@ -507,13 +509,15 @@ export default function AnalysisPage() {
                       <div className={`${activeTab === 'chart' ? 'block' : 'hidden'} md:block`}>
                         <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-4`}>
                           <h4 className="font-medium mb-3">Gráfico Bivariado</h4>
-                          <BivariateChart 
-                            variable1={selectedVariable.code} 
-                            variable2={secondaryVariable.code}
-                            excludedValues1={excludedPrimaryValues}
-                            excludedValues2={excludedSecondaryValues}
-                            darkMode={darkMode}
-                          />
+                          <div className="overflow-hidden chart-container" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+                            <BivariateChart 
+                              variable1={selectedVariable.code} 
+                              variable2={secondaryVariable.code}
+                              excludedValues1={excludedPrimaryValues}
+                              excludedValues2={excludedSecondaryValues}
+                              darkMode={darkMode}
+                            />
+                          </div>
                         </div>
                       </div>
                     </>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import throttle from 'lodash.throttle'; // Import throttle utility
 
 /**
  * Custom hook to calculate available vertical space for chart components
@@ -26,6 +27,8 @@ export default function useAvailableSpace({
   minHeight = 250
 }) {
   const [availableHeight, setAvailableHeight] = useState(defaultHeight);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [containerTop, setContainerTop] = useState(null);
 
   // Calculate the available height based on viewport and element measurements
   const calculateHeight = useCallback(() => {
@@ -43,13 +46,18 @@ export default function useAvailableSpace({
     const viewportSafetyOffset = windowWidth < 480 ? 30 : 20;
     
     // Get container position if available
-    let containerTop = 0;
+    let currentContainerTop = 0;
     let containerOffset = 0;
     if (containerRef?.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
-      containerTop = containerRect.top;
+      currentContainerTop = containerRect.top;
       // Consider container's position in the viewport
-      containerOffset = Math.max(0, containerTop);
+      containerOffset = Math.max(0, currentContainerTop);
+      
+      // Only update state if changed significantly (prevents minor fluctuations)
+      if (containerTop === null || Math.abs(currentContainerTop - containerTop) > 5) {
+        setContainerTop(currentContainerTop);
+      }
     }
     
     // Get header height if available
@@ -97,7 +105,8 @@ export default function useAvailableSpace({
     isFullscreen, 
     defaultHeight,
     additionalOffset,
-    minHeight
+    minHeight,
+    containerTop
   ]);
 
   // Effect to calculate height on mount and when dependencies change
@@ -105,30 +114,42 @@ export default function useAvailableSpace({
     // Initial calculation
     calculateHeight();
     
-    // Recalculate on resize and orientation change
+    // Regular resize handler (no throttling needed)
     const handleResize = () => {
       calculateHeight();
     };
     
-    // Recalculate when viewport size changes
-    window.addEventListener('resize', handleResize);
+    // Create a throttled scroll handler (executes at most once per 150ms)
+    const handleScrollThrottled = throttle(() => {
+      const currentScrollY = window.scrollY;
+      
+      // Only recalculate if scrolled by a significant amount
+      if (Math.abs(currentScrollY - lastScrollY) > 30) {
+        setLastScrollY(currentScrollY);
+        calculateHeight();
+      }
+    }, 150);
     
     // Handle orientation changes specifically for mobile
-    window.addEventListener('orientationchange', () => {
+    const handleOrientationChange = () => {
       // Add delay to ensure all layout changes are applied
       setTimeout(calculateHeight, 150);
-    });
+    };
     
-    // Recalculate on scroll in case container position changes
-    window.addEventListener('scroll', calculateHeight);
+    // Add event listeners
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('scroll', handleScrollThrottled);
     
     // Clean up event listeners
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-      window.removeEventListener('scroll', calculateHeight);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('scroll', handleScrollThrottled);
+      // Make sure to cancel any pending throttled executions
+      handleScrollThrottled.cancel();
     };
-  }, [calculateHeight]);
+  }, [calculateHeight, lastScrollY]);
 
   // Calculate height when certain props change
   useEffect(() => {

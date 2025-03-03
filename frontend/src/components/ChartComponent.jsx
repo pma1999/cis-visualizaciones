@@ -23,11 +23,12 @@ export default function ChartComponent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [chartInstance, setChartInstance] = useState(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoom, setZoom] = useState(initialZoom);
+  const [aspectRatio, setAspectRatio] = useState(initialAspectRatio);
   const [showLegend, setShowLegend] = useState(initialShowLegend);
-  const [downloadFormat, setDownloadFormat] = useState('png');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [totalExcluded, setTotalExcluded] = useState(0);
+  const [downloadFormat, setDownloadFormat] = useState('png');
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
   const [toolbarHeight, setToolbarHeight] = useState(0);
@@ -40,6 +41,7 @@ export default function ChartComponent({
     responsive: true,
     aspectRatio: initialAspectRatio
   });
+  const [chartInitialized, setChartInitialized] = useState(false);
   
   const chartRef = useRef(null);
   const chartContainer = useRef(null);
@@ -91,7 +93,7 @@ export default function ChartComponent({
       excludedValues1: excludedValues,
       darkMode: darkMode,
       zoom: zoom,
-      aspectRatio: chartOptions.aspectRatio,
+      aspectRatio: aspectRatio,
       showLegend: showLegend
     });
   };
@@ -268,10 +270,85 @@ export default function ChartComponent({
     return filteredData;
   };
 
+  // Modified effect for chart creation - only run when data or critical rendering options change
   useEffect(() => {
     if (loading || !chartRef.current) return;
     
-    // Limpiar gráfico existente
+    // If we already have a chart instance and just need to update it (not recreate)
+    if (chartInstance && chartInitialized && Object.keys(data).length > 0) {
+      try {
+        const processedData = getProcessedData();
+        if (processedData.length === 0) {
+          setError("No hay datos disponibles para visualizar");
+          return;
+        }
+        
+        const labels = processedData.map(([key]) => {
+          const label = valueLabels[key] || key;
+          // Acortar etiquetas muy largas
+          const maxLength = windowWidth < 640 ? 15 : 25;
+          return label.length > maxLength ? label.substring(0, maxLength - 3) + '...' : label;
+        });
+        
+        const values = processedData.map(([, value]) => value);
+        
+        // Update chart data without recreating
+        chartInstance.data.labels = labels;
+        chartInstance.data.datasets[0].data = values;
+        
+        // Update chart type if needed
+        chartInstance.config.type = chartType;
+        
+        // Adjust colors based on the new chart type
+        const baseColors = darkMode ? [
+          'rgba(59, 130, 246, 0.8)',    // blue-500
+          'rgba(16, 185, 129, 0.8)',    // emerald-500
+          'rgba(245, 158, 11, 0.8)',    // amber-500
+          'rgba(239, 68, 68, 0.8)',     // red-500
+          'rgba(139, 92, 246, 0.8)',    // violet-500
+          'rgba(236, 72, 153, 0.8)',    // pink-500
+          'rgba(20, 184, 166, 0.8)',    // teal-500
+          'rgba(249, 115, 22, 0.8)',    // orange-500
+          'rgba(6, 182, 212, 0.8)',     // cyan-500
+          'rgba(168, 85, 247, 0.8)'     // purple-500
+        ] : [
+          'rgba(37, 99, 235, 0.8)',     // blue-600
+          'rgba(5, 150, 105, 0.8)',     // emerald-600
+          'rgba(217, 119, 6, 0.8)',     // amber-600
+          'rgba(220, 38, 38, 0.8)',     // red-600
+          'rgba(124, 58, 237, 0.8)',    // violet-600
+          'rgba(219, 39, 119, 0.8)',    // pink-600
+          'rgba(13, 148, 136, 0.8)',    // teal-600
+          'rgba(234, 88, 12, 0.8)',     // orange-600
+          'rgba(8, 145, 178, 0.8)',     // cyan-600
+          'rgba(147, 51, 234, 0.8)'     // purple-600
+        ];
+        
+        // Generar colores suficientes para todos los datos
+        const colors = Array(values.length).fill().map((_, i) => baseColors[i % baseColors.length]);
+        
+        // Update colors based on chart type
+        chartInstance.data.datasets[0].backgroundColor = chartType === 'line' ? baseColors[0] : colors;
+        chartInstance.data.datasets[0].borderColor = chartType === 'line' ? baseColors[0] : colors;
+        
+        // Update specific options based on chart type
+        chartInstance.data.datasets[0].fill = chartType === 'line' ? false : undefined;
+        chartInstance.data.datasets[0].tension = chartType === 'line' ? 0.1 : undefined;
+        
+        // Update legend display
+        chartInstance.options.plugins.legend.display = showLegend && (chartType === 'pie' || chartType === 'doughnut');
+        
+        // Apply the updates
+        chartInstance.update();
+        return;
+      } catch (error) {
+        console.error("Error updating chart, will recreate:", error);
+        // If update fails, destroy and recreate
+        chartInstance.destroy();
+      }
+    }
+    
+    // Clean up existing chart instance if needed
     if (chartInstance) {
       chartInstance.destroy();
     }
@@ -434,14 +511,46 @@ export default function ChartComponent({
       // Store the chart instance in both state and ref
       setChartInstance(newChartInstance);
       chartInstanceRef.current = newChartInstance;
+      
+      // Mark as initialized after first creation
+      setChartInitialized(true);
     }, 0);
     
-    return () => {
-      if (chartInstance) {
-        chartInstance.destroy();
+  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend]);
+
+  // Separate effect for handling resize and zoom changes
+  useEffect(() => {
+    if (chartInstance && chartInitialized) {
+      // Apply new dimensions based on updated values
+      
+      // Calculate appropriate base aspect ratio based on screen width and orientation
+      let baseAspectRatio = windowWidth < 640 ? 1.2 : aspectRatio;
+      if (windowWidth < 640 && isPortrait) {
+        baseAspectRatio = 0.8;
       }
-    };
-  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, zoom, showLegend, chartOptions, windowWidth, isPortrait, chartHeight]);
+      
+      // Update aspect ratio with zoom applied
+      chartInstance.options.aspectRatio = baseAspectRatio * (100 / zoom);
+      
+      // Update font sizes if needed
+      if (chartInstance.options.scales && chartInstance.options.scales.x) {
+        chartInstance.options.scales.x.ticks.font.size = windowWidth < 640 ? 10 : 12;
+      }
+      if (chartInstance.options.scales && chartInstance.options.scales.y) {
+        chartInstance.options.scales.y.ticks.font.size = windowWidth < 640 ? 10 : 12;
+      }
+      
+      // Update legend font size
+      if (chartInstance.options.plugins && chartInstance.options.plugins.legend) {
+        chartInstance.options.plugins.legend.labels.padding = windowWidth < 640 ? 8 : 15;
+        chartInstance.options.plugins.legend.labels.font.size = windowWidth < 640 ? 10 : 12;
+      }
+      
+      // Apply changes and resize
+      chartInstance.resize();
+      chartInstance.update();
+    }
+  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -555,11 +664,20 @@ export default function ChartComponent({
   };
   
   const toggleAspectRatio = () => {
-    setChartOptions(prev => ({
-      ...prev, 
-      aspectRatio: prev.aspectRatio === 1.6 ? 1 : 1.6
-    }));
+    // Toggle between wide and square aspect ratio
+    const newRatio = aspectRatio === (windowWidth < 640 ? 1.2 : 1.6) ? 1 : (windowWidth < 640 ? 1.2 : 1.6);
+    setAspectRatio(newRatio);
   };
+
+  // Add cleanup effect
+  useEffect(() => {
+    // Cleanup function to destroy chart instance when component unmounts
+    return () => {
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+    };
+  }, [chartInstance]);
 
   if (loading) {
     return (
