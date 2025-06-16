@@ -481,10 +481,11 @@ export default function AnalysisPage() {
                         <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-4`}>
                           <h4 className="font-medium mb-3">Gráfico</h4>
                           <div className="overflow-hidden chart-container" style={{ maxHeight: 'calc(100vh - 250px)' }}>
-                            <ChartComponent 
-                              variable={selectedVariable.code} 
-                              chartType={chartType} 
-                              sortOrder={sortOrder} 
+                            <ChartComponent
+                              key={selectedVariable.code}
+                              variable={selectedVariable.code}
+                              chartType={chartType}
+                              sortOrder={sortOrder}
                               excludedValues={excludedPrimaryValues}
                               darkMode={darkMode}
                             />
@@ -510,8 +511,9 @@ export default function AnalysisPage() {
                         <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-4`}>
                           <h4 className="font-medium mb-3">Gráfico Bivariado</h4>
                           <div className="overflow-hidden chart-container" style={{ maxHeight: 'calc(100vh - 250px)' }}>
-                            <BivariateChart 
-                              variable1={selectedVariable.code} 
+                            <BivariateChart
+                              key={`${selectedVariable.code}_${secondaryVariable.code}`}
+                              variable1={selectedVariable.code}
                               variable2={secondaryVariable.code}
                               excludedValues1={excludedPrimaryValues}
                               excludedValues2={excludedSecondaryValues}
