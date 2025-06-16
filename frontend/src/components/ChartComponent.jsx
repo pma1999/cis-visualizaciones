@@ -2,10 +2,14 @@ import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { getDistribucion } from "../api/cisApi";
 import { API_URL } from "../api/cisApi";
 import Chart from 'chart.js/auto';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { getFormattedDate } from "../utils/chartExport";
 import ChartControls from "./charts/ChartControls";
 import useChartExport from "../hooks/useChartExport";
 import useAvailableSpace from "../hooks/useAvailableSpace";
+import { getChartColors } from "../utils/colorUtils";
+
+Chart.register(ChartDataLabels);
 
 export default function ChartComponent({ 
   variable, 
@@ -26,6 +30,7 @@ export default function ChartComponent({
   const [zoom, setZoom] = useState(initialZoom);
   const [aspectRatio, setAspectRatio] = useState(initialAspectRatio);
   const [showLegend, setShowLegend] = useState(initialShowLegend);
+  const [showLabels, setShowLabels] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [totalExcluded, setTotalExcluded] = useState(0);
   const [downloadFormat, setDownloadFormat] = useState('png');
@@ -42,6 +47,25 @@ export default function ChartComponent({
     aspectRatio: initialAspectRatio
   });
   const [chartInitialized, setChartInitialized] = useState(false);
+
+  // Apply gradient colors to datasets for a modern look
+  const applyGradientColors = (chart) => {
+    if (!chart || !chart.chartArea) return;
+    const { ctx, chartArea } = chart;
+    const { top, bottom } = chartArea;
+    const baseColors = getChartColors(chart.data.labels.length, darkMode);
+
+    const gradientColors = baseColors.map(color => {
+      const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)');
+      return gradient;
+    });
+
+    chart.data.datasets[0].backgroundColor = chartType === 'line' ? gradientColors[0] : gradientColors;
+    chart.data.datasets[0].borderColor = chartType === 'line' ? gradientColors[0] : gradientColors;
+    chart.update('none');
+  };
   
   const chartRef = useRef(null);
   const chartContainer = useRef(null);
@@ -300,32 +324,10 @@ export default function ChartComponent({
         chartInstance.config.type = chartType;
         
         // Adjust colors based on the new chart type
-        const baseColors = darkMode ? [
-          'rgba(59, 130, 246, 0.8)',    // blue-500
-          'rgba(16, 185, 129, 0.8)',    // emerald-500
-          'rgba(245, 158, 11, 0.8)',    // amber-500
-          'rgba(239, 68, 68, 0.8)',     // red-500
-          'rgba(139, 92, 246, 0.8)',    // violet-500
-          'rgba(236, 72, 153, 0.8)',    // pink-500
-          'rgba(20, 184, 166, 0.8)',    // teal-500
-          'rgba(249, 115, 22, 0.8)',    // orange-500
-          'rgba(6, 182, 212, 0.8)',     // cyan-500
-          'rgba(168, 85, 247, 0.8)'     // purple-500
-        ] : [
-          'rgba(37, 99, 235, 0.8)',     // blue-600
-          'rgba(5, 150, 105, 0.8)',     // emerald-600
-          'rgba(217, 119, 6, 0.8)',     // amber-600
-          'rgba(220, 38, 38, 0.8)',     // red-600
-          'rgba(124, 58, 237, 0.8)',    // violet-600
-          'rgba(219, 39, 119, 0.8)',    // pink-600
-          'rgba(13, 148, 136, 0.8)',    // teal-600
-          'rgba(234, 88, 12, 0.8)',     // orange-600
-          'rgba(8, 145, 178, 0.8)',     // cyan-600
-          'rgba(147, 51, 234, 0.8)'     // purple-600
-        ];
+        const baseColors = getChartColors(values.length, darkMode);
         
         // Generar colores suficientes para todos los datos
-        const colors = Array(values.length).fill().map((_, i) => baseColors[i % baseColors.length]);
+        const colors = getChartColors(values.length, darkMode);
         
         // Update colors based on chart type
         chartInstance.data.datasets[0].backgroundColor = chartType === 'line' ? baseColors[0] : colors;
@@ -370,32 +372,10 @@ export default function ChartComponent({
     const values = processedData.map(([, value]) => value);
     
     // Paleta de colores dinámica según modo oscuro
-    const baseColors = darkMode ? [
-      'rgba(59, 130, 246, 0.8)',    // blue-500
-      'rgba(16, 185, 129, 0.8)',    // emerald-500
-      'rgba(245, 158, 11, 0.8)',    // amber-500
-      'rgba(239, 68, 68, 0.8)',     // red-500
-      'rgba(139, 92, 246, 0.8)',    // violet-500
-      'rgba(236, 72, 153, 0.8)',    // pink-500
-      'rgba(20, 184, 166, 0.8)',    // teal-500
-      'rgba(249, 115, 22, 0.8)',    // orange-500
-      'rgba(6, 182, 212, 0.8)',     // cyan-500
-      'rgba(168, 85, 247, 0.8)'     // purple-500
-    ] : [
-      'rgba(37, 99, 235, 0.8)',     // blue-600
-      'rgba(5, 150, 105, 0.8)',     // emerald-600
-      'rgba(217, 119, 6, 0.8)',     // amber-600
-      'rgba(220, 38, 38, 0.8)',     // red-600
-      'rgba(124, 58, 237, 0.8)',    // violet-600
-      'rgba(219, 39, 119, 0.8)',    // pink-600
-      'rgba(13, 148, 136, 0.8)',    // teal-600
-      'rgba(234, 88, 12, 0.8)',     // orange-600
-      'rgba(8, 145, 178, 0.8)',     // cyan-600
-      'rgba(147, 51, 234, 0.8)'     // purple-600
-    ];
+    const baseColors = getChartColors(values.length, darkMode);
     
     // Generar colores suficientes para todos los datos
-    const colors = Array(values.length).fill().map((_, i) => baseColors[i % baseColors.length]);
+    const colors = getChartColors(values.length, darkMode);
     
     // Configurar el tema del gráfico según el modo oscuro
     Chart.defaults.color = darkMode ? '#e5e7eb' : '#374151';
@@ -473,6 +453,16 @@ export default function ChartComponent({
               }
             }
           },
+          datalabels: {
+            display: showLabels,
+            color: darkMode ? '#e5e7eb' : '#374151',
+            anchor: 'end',
+            align: 'top',
+            font: {
+              weight: 'bold',
+              size: windowWidth < 640 ? 8 : 12
+            }
+          },
           tooltip: {
             callbacks: {
               label: function(context) {
@@ -507,16 +497,19 @@ export default function ChartComponent({
     setTimeout(() => {
       const ctx = chartRef.current.getContext('2d');
       const newChartInstance = new Chart(ctx, chartConfig);
-      
+
+      // Apply gradient colors for improved aesthetics
+      applyGradientColors(newChartInstance);
+
       // Store the chart instance in both state and ref
       setChartInstance(newChartInstance);
       chartInstanceRef.current = newChartInstance;
-      
+
       // Mark as initialized after first creation
       setChartInitialized(true);
     }, 0);
     
-  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend]);
+  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend, showLabels]);
 
   // Separate effect for handling resize and zoom changes
   useEffect(() => {
@@ -545,12 +538,21 @@ export default function ChartComponent({
         chartInstance.options.plugins.legend.labels.padding = windowWidth < 640 ? 8 : 15;
         chartInstance.options.plugins.legend.labels.font.size = windowWidth < 640 ? 10 : 12;
       }
-      
+
+      if (chartInstance.options.plugins && chartInstance.options.plugins.datalabels) {
+        chartInstance.options.plugins.datalabels.display = showLabels;
+        chartInstance.options.plugins.datalabels.font.size = windowWidth < 640 ? 8 : 12;
+        chartInstance.options.plugins.datalabels.color = darkMode ? '#e5e7eb' : '#374151';
+      }
+
+      // Apply gradient colors again if needed
+      applyGradientColors(chartInstance);
+
       // Apply changes and resize
       chartInstance.resize();
       chartInstance.update();
     }
-  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized]);
+  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized, showLabels, darkMode]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -703,10 +705,10 @@ export default function ChartComponent({
       
       <div 
         ref={chartContainer}
-        className={`relative group overflow-hidden rounded-lg ${
-          isFullscreen 
-            ? 'bg-black w-screen h-screen flex items-center justify-center' 
-            : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-2 sm:p-4`
+        className={`relative group overflow-hidden rounded-lg shadow-lg transition-all ${
+          isFullscreen
+            ? `${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-700' : 'bg-gradient-to-br from-white to-gray-100'} w-screen h-screen flex items-center justify-center`
+            : `${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-700' : 'bg-gradient-to-br from-white to-gray-100'} p-2 sm:p-4`
         }`}
         style={{ 
           minHeight: isFullscreenPage ? '100%' : '250px',
@@ -716,9 +718,9 @@ export default function ChartComponent({
         {/* Controls container with absolute positioning */}
         <div 
           ref={toolbarRef}
-          className={`absolute top-0 left-0 right-0 z-10 px-2 py-2 sm:py-1.5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 border-b shadow-sm ${
-            isFullscreen || darkMode 
-              ? 'bg-black/30 backdrop-blur-sm border-gray-700/30' 
+          className={`absolute top-0 left-0 right-0 z-10 px-2 py-2 sm:py-1.5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-2 border-b rounded-b-lg shadow-md ${
+            isFullscreen || darkMode
+              ? 'bg-black/30 backdrop-blur-sm border-gray-700/30'
               : 'bg-white/70 backdrop-blur-sm border-gray-200/50'
           }`}
         >
@@ -763,6 +765,8 @@ export default function ChartComponent({
               resetZoom={resetZoom}
               showLegend={showLegend}
               toggleLegend={() => setShowLegend(!showLegend)}
+              showLabels={showLabels}
+              toggleLabels={() => setShowLabels(!showLabels)}
               toggleAspectRatio={toggleAspectRatio}
               toggleFullscreen={toggleFullscreen}
               isFullscreen={isFullscreen}
