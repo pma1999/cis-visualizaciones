@@ -2,22 +2,27 @@ import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { getDistribucion } from "../api/cisApi";
 import { API_URL } from "../api/cisApi";
 import Chart from 'chart.js/auto';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
+// Register plugin once
+Chart.register(ChartDataLabels);
 import { getFormattedDate } from "../utils/chartExport";
 import ChartControls from "./charts/ChartControls";
 import useChartExport from "../hooks/useChartExport";
 import useAvailableSpace from "../hooks/useAvailableSpace";
 import { getChartColors } from "../utils/colorUtils";
 
-export default function ChartComponent({ 
-  variable, 
-  chartType = 'bar', 
-  sortOrder = 'code', 
+export default function ChartComponent({
+  variable,
+  chartType = 'bar',
+  sortOrder = 'code',
   excludedValues = [],
   darkMode = false,
   isFullscreenPage = false,
   initialZoom = 100,
   initialAspectRatio = 1.6,
-  initialShowLegend = true
+  initialShowLegend = true,
+  onChangeChartType
 }) {
   const [data, setData] = useState({});
   const [valueLabels, setValueLabels] = useState({});
@@ -27,6 +32,8 @@ export default function ChartComponent({
   const [zoom, setZoom] = useState(initialZoom);
   const [aspectRatio, setAspectRatio] = useState(initialAspectRatio);
   const [showLegend, setShowLegend] = useState(initialShowLegend);
+  const [showLabels, setShowLabels] = useState(false);
+  const [viewMode, setViewMode] = useState('absolute');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [totalExcluded, setTotalExcluded] = useState(0);
   const [downloadFormat, setDownloadFormat] = useState('png');
@@ -40,7 +47,12 @@ export default function ChartComponent({
   const [chartOptions, setChartOptions] = useState({
     animation: true,
     responsive: true,
-    aspectRatio: initialAspectRatio
+    aspectRatio: initialAspectRatio,
+    plugins: {
+      datalabels: {
+        display: false
+      }
+    }
   });
   const [chartInitialized, setChartInitialized] = useState(false);
 
@@ -114,7 +126,9 @@ export default function ChartComponent({
       darkMode: darkMode,
       zoom: zoom,
       aspectRatio: aspectRatio,
-      showLegend: showLegend
+      showLegend: showLegend,
+      showLabels: showLabels,
+      viewMode: viewMode
     });
   };
 
@@ -311,10 +325,16 @@ export default function ChartComponent({
         });
         
         const values = processedData.map(([, value]) => value);
-        
+        const dataValues = viewMode === 'relative'
+          ? (() => {
+              const total = values.reduce((sum, v) => sum + v, 0);
+              return values.map(v => total ? (v / total) * 100 : 0);
+            })()
+          : values;
+
         // Update chart data without recreating
         chartInstance.data.labels = labels;
-        chartInstance.data.datasets[0].data = values;
+        chartInstance.data.datasets[0].data = dataValues;
         
         // Update chart type if needed
         chartInstance.config.type = chartType;
@@ -335,7 +355,15 @@ export default function ChartComponent({
         
         // Update legend display
         chartInstance.options.plugins.legend.display = showLegend && (chartType === 'pie' || chartType === 'doughnut');
-        
+        // Update datalabels options
+        if (chartInstance.options.plugins.datalabels) {
+          chartInstance.options.plugins.datalabels.display = showLabels;
+          chartInstance.options.plugins.datalabels.color = darkMode ? '#e5e7eb' : '#374151';
+          chartInstance.options.plugins.datalabels.font.size = windowWidth < 640 ? 10 : 12;
+          chartInstance.options.plugins.datalabels.formatter = (value) =>
+            viewMode === 'relative' ? `${value.toFixed(1)}%` : value.toLocaleString();
+        }
+
         // Apply the updates
         chartInstance.update();
         return;
@@ -391,7 +419,12 @@ export default function ChartComponent({
         labels,
         datasets: [{
           label: `${variable}`,
-          data: values,
+          data: viewMode === 'relative'
+            ? (() => {
+                const total = values.reduce((sum, v) => sum + v, 0);
+                return values.map(v => total ? (v / total) * 100 : 0);
+              })()
+            : values,
           backgroundColor: chartType === 'line' ? baseColors[0] : colors,
           borderColor: chartType === 'line' ? baseColors[0] : colors,
           borderWidth: 1,
@@ -427,6 +460,7 @@ export default function ChartComponent({
           },
           y: {
             beginAtZero: true,
+            suggestedMax: viewMode === 'relative' ? 100 : undefined,
             grid: {
               color: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
             },
@@ -449,10 +483,26 @@ export default function ChartComponent({
               }
             }
           },
+          datalabels: {
+            display: showLabels,
+            color: darkMode ? '#e5e7eb' : '#374151',
+            anchor: 'end',
+            align: 'top',
+            font: {
+              size: windowWidth < 640 ? 10 : 12
+            },
+            formatter: (value) =>
+              viewMode === 'relative'
+                ? `${value.toFixed(1)}%`
+                : value.toLocaleString()
+          },
           tooltip: {
             callbacks: {
               label: function(context) {
                 const value = context.raw;
+                if (viewMode === 'relative') {
+                  return `${value.toFixed(1)}%`;
+                }
                 const total = context.chart.data.datasets[0].data.reduce((sum, val) => sum + val, 0);
                 const percentage = Math.round((value / total) * 100);
                 return `${value.toLocaleString()} (${percentage}%)`;
@@ -495,7 +545,7 @@ export default function ChartComponent({
       setChartInitialized(true);
     }, 0);
     
-  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend]);
+  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend, showLabels, viewMode]);
 
   // Separate effect for handling resize and zoom changes
   useEffect(() => {
@@ -517,12 +567,21 @@ export default function ChartComponent({
       }
       if (chartInstance.options.scales && chartInstance.options.scales.y) {
         chartInstance.options.scales.y.ticks.font.size = windowWidth < 640 ? 10 : 12;
+        chartInstance.options.scales.y.suggestedMax = viewMode === 'relative' ? 100 : undefined;
       }
       
       // Update legend font size
       if (chartInstance.options.plugins && chartInstance.options.plugins.legend) {
         chartInstance.options.plugins.legend.labels.padding = windowWidth < 640 ? 8 : 15;
         chartInstance.options.plugins.legend.labels.font.size = windowWidth < 640 ? 10 : 12;
+      }
+
+      if (chartInstance.options.plugins && chartInstance.options.plugins.datalabels) {
+        chartInstance.options.plugins.datalabels.font.size = windowWidth < 640 ? 10 : 12;
+        chartInstance.options.plugins.datalabels.color = darkMode ? '#e5e7eb' : '#374151';
+        chartInstance.options.plugins.datalabels.display = showLabels;
+        chartInstance.options.plugins.datalabels.formatter = (value) =>
+          viewMode === 'relative' ? `${value.toFixed(1)}%` : value.toLocaleString();
       }
       
       // Apply gradient colors again if needed
@@ -532,7 +591,7 @@ export default function ChartComponent({
       chartInstance.resize();
       chartInstance.update();
     }
-  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized]);
+  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized, showLabels, darkMode, viewMode]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -687,7 +746,7 @@ export default function ChartComponent({
         ref={chartContainer}
         className={`relative group overflow-hidden rounded-lg shadow-lg transition-all ${
           isFullscreen
-            ? 'bg-black w-screen h-screen flex items-center justify-center'
+            ? `${darkMode ? 'bg-gray-800' : 'bg-white'} w-screen h-screen flex items-center justify-center`
             : `${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-700' : 'bg-gradient-to-br from-white to-gray-100'} p-2 sm:p-4`
         }`}
         style={{ 
@@ -709,7 +768,13 @@ export default function ChartComponent({
             <select
               className={`text-xs p-1 rounded border w-full sm:w-auto min-w-[120px] ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
               value={chartType}
-              onChange={(e) => window.location.href = `?variable=${variable}&chartType=${e.target.value}&sortOrder=${sortOrder}`}
+              onChange={(e) => {
+                if (onChangeChartType) {
+                  onChangeChartType(e.target.value);
+                } else {
+                  window.location.href = `?variable=${variable}&chartType=${e.target.value}&sortOrder=${sortOrder}`;
+                }
+              }}
               aria-label="Tipo de gráfico"
             >
               <option value="bar">Barras</option>
@@ -745,10 +810,14 @@ export default function ChartComponent({
               resetZoom={resetZoom}
               showLegend={showLegend}
               toggleLegend={() => setShowLegend(!showLegend)}
+              showLabels={showLabels}
+              toggleLabels={() => setShowLabels(!showLabels)}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
               toggleAspectRatio={toggleAspectRatio}
               toggleFullscreen={toggleFullscreen}
               isFullscreen={isFullscreen}
-              hideViewModeSelector={true}
+              hideViewModeSelector={false}
             />
           </div>
         </div>

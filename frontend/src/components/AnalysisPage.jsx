@@ -481,12 +481,13 @@ export default function AnalysisPage() {
                         <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-4`}>
                           <h4 className="font-medium mb-3">Gráfico</h4>
                           <div className="overflow-hidden chart-container" style={{ maxHeight: 'calc(100vh - 250px)' }}>
-                            <ChartComponent 
-                              variable={selectedVariable.code} 
-                              chartType={chartType} 
-                              sortOrder={sortOrder} 
+                            <ChartComponent
+                              variable={selectedVariable.code}
+                              chartType={chartType}
+                              sortOrder={sortOrder}
                               excludedValues={excludedPrimaryValues}
                               darkMode={darkMode}
+                              onChangeChartType={setChartType}
                             />
                           </div>
                         </div>

@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.0.8",
     "chart.js": "^4.4.8",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "html2canvas": "^1.4.1",
     "lodash.throttle": "^4.1.1",
     "react": "^19.0.0",
