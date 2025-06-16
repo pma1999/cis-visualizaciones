@@ -2,7 +2,10 @@ import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import useBivariateData from "../hooks/useBivariateData";
 import useChartExport from "../hooks/useChartExport";
 import Chart from 'chart.js/auto';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 import ChartControls from "./charts/ChartControls";
+
+Chart.register(ChartDataLabels);
 import { getFormattedDate } from "../utils/chartExport";
 import useAvailableSpace from "../hooks/useAvailableSpace";
 
@@ -41,6 +44,7 @@ export default function BivariateChart({
   // State variables for chart display
   const [aspectRatio, setAspectRatio] = useState(windowWidth < 640 ? 1.2 : 1.6);
   const [showLegend, setShowLegend] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Add download format state
@@ -252,6 +256,7 @@ export default function BivariateChart({
     aspectRatio,
     zoom,
     showLegend,
+    showLabels,
     chartHeight
   ]);
 
@@ -293,10 +298,19 @@ export default function BivariateChart({
   // Add legend toggle function
   const toggleLegend = () => {
     setShowLegend(!showLegend);
-    
+
     // Update chart if it exists
     if (chartInstance) {
       chartInstance.options.plugins.legend.display = !showLegend;
+      chartInstance.update();
+    }
+  };
+
+  const toggleLabels = () => {
+    setShowLabels(!showLabels);
+
+    if (chartInstance) {
+      chartInstance.options.plugins.datalabels.display = !showLabels;
       chartInstance.update();
     }
   };
@@ -484,6 +498,16 @@ export default function BivariateChart({
                 size: windowWidth < 640 ? 10 : 12
               }
             }
+          },
+          datalabels: {
+            display: showLabels,
+            color: darkMode ? '#e5e7eb' : '#374151',
+            anchor: 'end',
+            align: 'top',
+            font: {
+              size: windowWidth < 640 ? 10 : 12
+            },
+            formatter: (value) => value.toLocaleString()
           }
         },
         scales: {
@@ -584,7 +608,8 @@ export default function BivariateChart({
       excludedValues2,
       zoom: zoom,
       aspectRatio: aspectRatio,
-      showLegend: showLegend
+      showLegend: showLegend,
+      showLabels: showLabels
     });
   };
 
@@ -634,8 +659,8 @@ export default function BivariateChart({
         <div 
           ref={localChartContainer}
           className={`relative overflow-hidden rounded-lg ${
-            isFullscreen 
-              ? 'bg-black w-screen h-screen flex items-center justify-center' 
+            isFullscreen
+              ? `${darkMode ? 'bg-gray-800' : 'bg-white'} w-screen h-screen flex items-center justify-center`
               : `${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/50'} p-2 sm:p-4`
           }`}
           style={{ 
@@ -693,6 +718,8 @@ export default function BivariateChart({
                 resetZoom={resetZoom}
                 showLegend={showLegend}
                 toggleLegend={toggleLegend}
+                showLabels={showLabels}
+                toggleLabels={toggleLabels}
                 toggleAspectRatio={toggleAspectRatio}
                 toggleFullscreen={toggleFullscreen}
                 isFullscreen={isFullscreen}

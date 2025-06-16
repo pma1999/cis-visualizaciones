@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * Componente para los controles de interacción con los gráficos
@@ -17,6 +16,8 @@ import React from 'react';
  * @param {Function} props.resetZoom - Función para resetear el zoom
  * @param {boolean} props.showLegend - Si se muestra la leyenda
  * @param {Function} props.toggleLegend - Función para mostrar/ocultar la leyenda
+ * @param {boolean} props.showLabels - Si se muestran las etiquetas de datos
+ * @param {Function} props.toggleLabels - Función para mostrar/ocultar las etiquetas
  * @param {Function} props.toggleAspectRatio - Función para cambiar la relación de aspecto
  * @param {Function} props.toggleFullscreen - Función para alternar pantalla completa
  * @param {boolean} props.isFullscreen - Si el gráfico está en pantalla completa
@@ -36,6 +37,8 @@ const ChartControls = ({
   resetZoom,
   showLegend,
   toggleLegend,
+  showLabels,
+  toggleLabels,
   toggleAspectRatio,
   toggleFullscreen,
   isFullscreen = false,
@@ -137,6 +140,18 @@ const ChartControls = ({
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </button>
+        )}
+
+        {toggleLabels && (
+          <button
+            onClick={toggleLabels}
+            className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
+            title={showLabels ? "Ocultar valores" : "Mostrar valores"}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h7" />
             </svg>
           </button>
         )}

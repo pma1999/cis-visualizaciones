@@ -2,6 +2,10 @@ import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { getDistribucion } from "../api/cisApi";
 import { API_URL } from "../api/cisApi";
 import Chart from 'chart.js/auto';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
+// Register plugin once
+Chart.register(ChartDataLabels);
 import { getFormattedDate } from "../utils/chartExport";
 import ChartControls from "./charts/ChartControls";
 import useChartExport from "../hooks/useChartExport";
@@ -27,6 +31,7 @@ export default function ChartComponent({
   const [zoom, setZoom] = useState(initialZoom);
   const [aspectRatio, setAspectRatio] = useState(initialAspectRatio);
   const [showLegend, setShowLegend] = useState(initialShowLegend);
+  const [showLabels, setShowLabels] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [totalExcluded, setTotalExcluded] = useState(0);
   const [downloadFormat, setDownloadFormat] = useState('png');
@@ -40,7 +45,12 @@ export default function ChartComponent({
   const [chartOptions, setChartOptions] = useState({
     animation: true,
     responsive: true,
-    aspectRatio: initialAspectRatio
+    aspectRatio: initialAspectRatio,
+    plugins: {
+      datalabels: {
+        display: false
+      }
+    }
   });
   const [chartInitialized, setChartInitialized] = useState(false);
 
@@ -114,7 +124,8 @@ export default function ChartComponent({
       darkMode: darkMode,
       zoom: zoom,
       aspectRatio: aspectRatio,
-      showLegend: showLegend
+      showLegend: showLegend,
+      showLabels: showLabels
     });
   };
 
@@ -335,7 +346,13 @@ export default function ChartComponent({
         
         // Update legend display
         chartInstance.options.plugins.legend.display = showLegend && (chartType === 'pie' || chartType === 'doughnut');
-        
+        // Update datalabels options
+        if (chartInstance.options.plugins.datalabels) {
+          chartInstance.options.plugins.datalabels.display = showLabels;
+          chartInstance.options.plugins.datalabels.color = darkMode ? '#e5e7eb' : '#374151';
+          chartInstance.options.plugins.datalabels.font.size = windowWidth < 640 ? 10 : 12;
+        }
+
         // Apply the updates
         chartInstance.update();
         return;
@@ -449,6 +466,16 @@ export default function ChartComponent({
               }
             }
           },
+          datalabels: {
+            display: showLabels,
+            color: darkMode ? '#e5e7eb' : '#374151',
+            anchor: 'end',
+            align: 'top',
+            font: {
+              size: windowWidth < 640 ? 10 : 12
+            },
+            formatter: (value) => value.toLocaleString()
+          },
           tooltip: {
             callbacks: {
               label: function(context) {
@@ -495,7 +522,7 @@ export default function ChartComponent({
       setChartInitialized(true);
     }, 0);
     
-  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend]);
+  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend, showLabels]);
 
   // Separate effect for handling resize and zoom changes
   useEffect(() => {
@@ -524,6 +551,12 @@ export default function ChartComponent({
         chartInstance.options.plugins.legend.labels.padding = windowWidth < 640 ? 8 : 15;
         chartInstance.options.plugins.legend.labels.font.size = windowWidth < 640 ? 10 : 12;
       }
+
+      if (chartInstance.options.plugins && chartInstance.options.plugins.datalabels) {
+        chartInstance.options.plugins.datalabels.font.size = windowWidth < 640 ? 10 : 12;
+        chartInstance.options.plugins.datalabels.color = darkMode ? '#e5e7eb' : '#374151';
+        chartInstance.options.plugins.datalabels.display = showLabels;
+      }
       
       // Apply gradient colors again if needed
       applyGradientColors(chartInstance);
@@ -532,7 +565,7 @@ export default function ChartComponent({
       chartInstance.resize();
       chartInstance.update();
     }
-  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized]);
+  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized, showLabels, darkMode]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -687,7 +720,7 @@ export default function ChartComponent({
         ref={chartContainer}
         className={`relative group overflow-hidden rounded-lg shadow-lg transition-all ${
           isFullscreen
-            ? 'bg-black w-screen h-screen flex items-center justify-center'
+            ? `${darkMode ? 'bg-gray-800' : 'bg-white'} w-screen h-screen flex items-center justify-center`
             : `${darkMode ? 'bg-gradient-to-br from-gray-800 to-gray-700' : 'bg-gradient-to-br from-white to-gray-100'} p-2 sm:p-4`
         }`}
         style={{ 
@@ -745,6 +778,8 @@ export default function ChartComponent({
               resetZoom={resetZoom}
               showLegend={showLegend}
               toggleLegend={() => setShowLegend(!showLegend)}
+              showLabels={showLabels}
+              toggleLabels={() => setShowLabels(!showLabels)}
               toggleAspectRatio={toggleAspectRatio}
               toggleFullscreen={toggleFullscreen}
               isFullscreen={isFullscreen}
