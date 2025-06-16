@@ -35,6 +35,7 @@ export default function ChartComponent({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [totalExcluded, setTotalExcluded] = useState(0);
   const [downloadFormat, setDownloadFormat] = useState('png');
+  const [viewMode, setViewMode] = useState('absolute');
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
   const [toolbarHeight, setToolbarHeight] = useState(0);
@@ -122,6 +123,7 @@ export default function ChartComponent({
       sortOrder: sortOrder,
       excludedValues1: excludedValues,
       darkMode: darkMode,
+      viewMode: viewMode,
       zoom: zoom,
       aspectRatio: aspectRatio,
       showLegend: showLegend,
@@ -321,7 +323,13 @@ export default function ChartComponent({
           return label.length > maxLength ? label.substring(0, maxLength - 3) + '...' : label;
         });
         
-        const values = processedData.map(([, value]) => value);
+        const total = processedData.reduce((sum, [, val]) => sum + val, 0);
+        const values = processedData.map(([, value]) =>
+          viewMode === 'relative'
+            ? total > 0 ? (value / total) * 100 : 0
+            : value
+        );
+        const originalValues = processedData.map(([, value]) => value);
         
         // Update chart data without recreating
         chartInstance.data.labels = labels;
@@ -351,6 +359,23 @@ export default function ChartComponent({
           chartInstance.options.plugins.datalabels.display = showLabels;
           chartInstance.options.plugins.datalabels.color = darkMode ? '#e5e7eb' : '#374151';
           chartInstance.options.plugins.datalabels.font.size = windowWidth < 640 ? 10 : 12;
+          chartInstance.options.plugins.datalabels.formatter = (val, ctx) => {
+            if (viewMode === 'relative') {
+              return `${val.toFixed(1)}%`;
+            }
+            return originalValues[ctx.dataIndex].toLocaleString();
+          };
+        }
+        if (chartInstance.options.plugins.tooltip && chartInstance.options.plugins.tooltip.callbacks) {
+          chartInstance.options.plugins.tooltip.callbacks.label = function(context) {
+            const value = originalValues[context.dataIndex];
+            const total = originalValues.reduce((sum, val) => sum + val, 0);
+            const percentage = total > 0 ? (value / total) * 100 : 0;
+            if (viewMode === 'relative') {
+              return `${percentage.toFixed(1)}% (${value.toLocaleString()})`;
+            }
+            return `${value.toLocaleString()} (${percentage.toFixed(1)}%)`;
+          };
         }
 
         // Apply the updates
@@ -382,7 +407,13 @@ export default function ChartComponent({
       return label.length > maxLength ? label.substring(0, maxLength - 3) + '...' : label;
     });
     
-    const values = processedData.map(([, value]) => value);
+    const total = processedData.reduce((sum, [, val]) => sum + val, 0);
+    const values = processedData.map(([, value]) =>
+      viewMode === 'relative'
+        ? total > 0 ? (value / total) * 100 : 0
+        : value
+    );
+    const originalValues = processedData.map(([, value]) => value);
     
     // Paleta de colores dinámica según modo oscuro
     const baseColors = getChartColors(values.length, darkMode);
@@ -447,7 +478,17 @@ export default function ChartComponent({
             grid: {
               color: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
             },
+            title: {
+              display: true,
+              text: viewMode === 'relative' ? 'Porcentaje (%)' : 'Frecuencia',
+              color: darkMode ? '#e5e7eb' : '#374151',
+              font: {
+                size: windowWidth < 640 ? 11 : 12
+              }
+            },
             ticks: {
+              callback: viewMode === 'relative' ? (val) => `${val}%` : undefined,
+              max: viewMode === 'relative' ? 100 : undefined,
               font: {
                 size: windowWidth < 640 ? 10 : 12
               }
@@ -474,15 +515,23 @@ export default function ChartComponent({
             font: {
               size: windowWidth < 640 ? 10 : 12
             },
-            formatter: (value) => value.toLocaleString()
+            formatter: (val, ctx) => {
+              if (viewMode === 'relative') {
+                return `${val.toFixed(1)}%`;
+              }
+              return originalValues[ctx.dataIndex].toLocaleString();
+            }
           },
           tooltip: {
             callbacks: {
               label: function(context) {
-                const value = context.raw;
-                const total = context.chart.data.datasets[0].data.reduce((sum, val) => sum + val, 0);
-                const percentage = Math.round((value / total) * 100);
-                return `${value.toLocaleString()} (${percentage}%)`;
+                const value = originalValues[context.dataIndex];
+                const total = originalValues.reduce((sum, val) => sum + val, 0);
+                const percentage = total > 0 ? (value / total) * 100 : 0;
+                if (viewMode === 'relative') {
+                  return `${percentage.toFixed(1)}% (${value.toLocaleString()})`;
+                }
+                return `${value.toLocaleString()} (${percentage.toFixed(1)}%)`;
               }
             },
             backgroundColor: darkMode ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
@@ -522,7 +571,7 @@ export default function ChartComponent({
       setChartInitialized(true);
     }, 0);
     
-  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend, showLabels]);
+  }, [variable, chartType, sortOrder, excludedValues, data, valueLabels, loading, darkMode, showLegend, showLabels, viewMode]);
 
   // Separate effect for handling resize and zoom changes
   useEffect(() => {
@@ -565,7 +614,7 @@ export default function ChartComponent({
       chartInstance.resize();
       chartInstance.update();
     }
-  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized, showLabels, darkMode]);
+  }, [windowWidth, windowHeight, chartHeight, zoom, aspectRatio, isPortrait, chartInitialized, showLabels, darkMode, viewMode]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -628,7 +677,7 @@ export default function ChartComponent({
         filename: filename,
         format: format,
         title: `Distribución de ${variable}`,
-        subtitle: `Tipo: ${getChartTypeName(chartType)}`,
+        subtitle: `Tipo: ${getChartTypeName(chartType)} | Modo: ${viewMode === 'absolute' ? 'Absoluto' : 'Relativo'}`,
         footnote: `Generado el ${date}`,
         darkMode: darkMode,
         // Include legend items for all chart types
@@ -742,7 +791,7 @@ export default function ChartComponent({
             <select
               className={`text-xs p-1 rounded border w-full sm:w-auto min-w-[120px] ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
               value={chartType}
-              onChange={(e) => window.location.href = `?variable=${variable}&chartType=${e.target.value}&sortOrder=${sortOrder}`}
+              onChange={(e) => setChartType(e.target.value)}
               aria-label="Tipo de gráfico"
             >
               <option value="bar">Barras</option>
@@ -766,7 +815,9 @@ export default function ChartComponent({
               </select>
             </div>
             
-            <ChartControls 
+            <ChartControls
+              viewMode={viewMode}
+              setViewMode={setViewMode}
               exporting={exporting}
               handleExportChart={downloadChart}
               openInNewTab={openInNewTab}
@@ -783,7 +834,7 @@ export default function ChartComponent({
               toggleAspectRatio={toggleAspectRatio}
               toggleFullscreen={toggleFullscreen}
               isFullscreen={isFullscreen}
-              hideViewModeSelector={true}
+              hideViewModeSelector={false}
             />
           </div>
         </div>
